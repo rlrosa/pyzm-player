@@ -16,6 +16,9 @@ import gst
 import gst.interfaces
 
 import collections
+import getopt
+
+import zmq
 
 class GstPlayer:
     def __init__(self):
@@ -116,12 +119,21 @@ class GstPlayer:
         return self.playing
 
 class PlayerControl():
+    """ PlayerControl is plays mp3 files. Receives commands over zmq """
     handlers = None
     queded = False
 
-    def __init__(self):
+    # zmq variables
+    port    = None
+    context = None
+    server  = None
 
-        self.player = GstPlayer()
+    def __init__(self, port):
+
+        self.player  = GstPlayer()
+        self.port    = port
+        self.context = None
+        self.server  = None
 
         def on_eos():
             self.player.seek(0L)
@@ -141,6 +153,14 @@ class PlayerControl():
         self.register('is_playing',self.is_playing)
         self.register('quit',self.quit)
         self.register('help',self.help)
+
+    def __enter__(self):
+        return self
+
+    def __del__(self):
+        """ Cleanup zmq stuff if any exists """
+        print "Terminating server..."
+        self.zmq_deinit()
 
     def register(self, event, callback):
         self.handlers[event].add(callback)
@@ -184,44 +204,105 @@ class PlayerControl():
     def is_registered(self, cmd):
         return cmd in self.handlers
 
-    def quit(self):
-         sys.exit(0)
-
-def main(args):
-    def usage():
-        sys.stderr.write("usage: %s URI-OF-MEDIA-FILE\n" % args[0])
-        sys.exit(1)
-
-    pl = PlayerControl()
-
-    if len(args) != 2:
-        usage()
-
-    pl.load_file(args[1])
-
-    # input loop
-    cmd = 0
-    arg = 0
-    while(cmd >= 0):
-        line = raw_input('Command:')
-        words = line.split()
+    def handle_cmd(self, msg):
+        """Receives a msg and executes it if it corresponds to a registered cmd"""
+        words = msg.split()
         in_len = len(words)
         if in_len == 2 and words[0] == 'load':
             # must be new file
             new_file = words[1]
             if (gst.uri_is_valid(new_file)):
                 # load new file
-                pl.load_file(new_file)
+                self.load_file(new_file)
             else:
                 sys.stderr.write("Error: Invalid URI: %s\nIgnoring..." % new_file)
         elif (in_len == 1):
             # update command (play, pause, etc)
             cmd = words[0]
-            if not pl.is_registered(cmd):
+            if not self.is_registered(cmd):
                 sys.stderr.write("Error: Invalid command: %s, Ignoring...\n" % cmd)
-                pl.help()
+                self.help()
             else:
-                pl.fire(cmd)
+                self.fire(cmd)
+
+    def zmq_init(self):
+        self.context = zmq.Context()
+        self.server  = self.context.socket(zmq.REP)
+        self.server.bind('tcp://*:%d' % self.port)
+
+    def zmq_deinit(self):
+        if self.context != None:
+            if self.server != None:
+                self.server.close()
+            self.context.term()
+
+    def run_zmq(self):
+        self.zmq_init()
+        print 'Server running, listening on zmq port %d...' % self.port
+        while True:
+            msg = self.server.recv()
+            self.server.send('ack')
+            self.handle_cmd(msg)
+
+    def run_stdin(self):
+        print 'Server running, listening on stdin...'
+        # input loop
+        cmd = 0
+        arg = 0
+        while(True):
+            line = raw_input('Command:')
+            self.handle_cmd(line)
+
+    def quit(self):
+        # cleanup is performed by self.__del__()
+        sys.exit(0)
+
+def main(argv):
+
+    def usage():
+        help_str = "Valid arguments:\n"\
+            "\t-f mediaFileUri\t//\t--file=uriOfMediaFile\n"\
+            "\t-p portNumber\t//\t--port=portNumber\n"\
+            "\t-l [zmq,stdin]\t//\t--listen=[zmq,stdin]\n"\
+            "\t-i\t\t//\t--info\n"
+        sys.stderr.write("%s" % help_str)
+        sys.exit(1)
+
+    # default values
+    port      = 5555
+    file_name = None
+    listen    = 'zmq'
+
+    # parse command line arguments
+    # note: Cannot use -h/--help with gst:
+    #           - https://bugzilla.gnome.org/show_bug.cgi?id=625211 
+    #           - https://bugzilla.gnome.org/show_bug.cgi?id=549879
+    arg_list = argv[1:]
+    try:
+        opts, args = getopt.getopt(arg_list, "ip:f:l:", ["i", "port=", "file=", "listen="])
+    except getopt.GetoptError:
+        usage()
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ("-i","--info"):
+            usage()
+            sys.exit()
+        elif opt in ("-p", "--port"):
+            port = int(arg)
+        elif opt in ("-f", "--file"):
+            file_name = arg
+        elif opt in ("-l", "--listen"):
+            listen = arg
+
+    pl = PlayerControl(port)
+
+    if(file_name != None):
+        pl.load_file(file_name)
+
+    if listen == 'stdin':
+        pl.run_stdin()
+    else:
+        pl.run_zmq()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
