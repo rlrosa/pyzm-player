@@ -49,7 +49,7 @@ def main(argv):
     def usage():
         help_str = "Valid arguments:\n"\
             "\t-p portNumber\t//\t--port=portNumber\n"\
-            "\t-h\t\t//\t--help\n"
+            "\t-i\t\t//\t--info\n"
         sys.stderr.write("%s" % help_str)
         sys.exit(1)
 
@@ -60,12 +60,12 @@ def main(argv):
     # parse command line arguments
     arg_list = argv[1:]
     try:
-        opts, args = getopt.getopt(arg_list, "hp:", ["help", "port="])
+        opts, args = getopt.getopt(arg_list, "ip:", ["info", "port="])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
     for opt, arg in opts:
-        if opt in ("-h","--help"):
+        if opt in ("-i","--info"):
             usage()
             sys.exit()
         elif opt in ("-p", "--port"):
