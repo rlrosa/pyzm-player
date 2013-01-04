@@ -49,7 +49,7 @@ def main(argv):
     def usage():
         help_str = "Valid arguments:\n"\
             "\t-p portNumber\t//\t--port=portNumber\n"\
-            "\t-h\t//\t--help\n"
+            "\t-h\t\t//\t--help\n"
         sys.stderr.write("%s" % help_str)
         sys.exit(1)
 
