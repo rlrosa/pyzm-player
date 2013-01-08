@@ -320,7 +320,8 @@ def main(argv):
             "\t-f mediaFileUri\t//\t--file=uriOfMediaFile\n"\
             "\t-p portNumber\t//\t--port=portNumber\n"\
             "\t-l [zmq,stdin]\t//\t--listen=[zmq,stdin]\n"\
-            "\t-i\t\t//\t--info\n"
+            "\t-i\t\t//\t--info\n"\
+            "\t-v\t\t//\t--verify\n"
         sys.stderr.write("%s" % help_str)
         sys.exit(1)
 
