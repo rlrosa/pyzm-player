@@ -18,7 +18,7 @@ import gst.interfaces
 import collections
 import getopt
 from time import sleep
-
+from urllib2 import urlopen
 import threading
 
 import zmq
@@ -193,12 +193,13 @@ Usage example:
     server  = None
     src     = None
 
-    def __init__(self, src, port=5555):
-        self.port         = port
-        self.src          = src
-        self.player       = GstPlayer()
-        self.gst_listener = GstListener(args=(self.player.bus, self.player.on_message),kwargs=[])
-        self.listener     = Listener(args=(self.handle_cmd, self.src, self.port),kwargs=[])
+    def __init__(self, src, port=5555, verify_on_load=False):
+        self.port           = port
+        self.src            = src
+        self.verify_on_load = verify_on_load
+        self.player         = GstPlayer()
+        self.gst_listener   = GstListener(args=(self.player.bus, self.player.on_message),kwargs=[])
+        self.listener       = Listener(args=(self.handle_cmd, self.src, self.port),kwargs=[])
 
         # init callbacks
         self.handlers = collections.defaultdict(set)
@@ -224,12 +225,35 @@ Usage example:
 
     def load_file(self, location):
         if not gst.uri_is_valid(location):
-            sys.stderr.write("Error: Invalid URI: %s\nExpected uri"
-                             "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
+            gst.error("Error: Invalid URI: %s\nExpected uri"
+                      "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
         else:
             # if(self.player.is_playing()):
             #     self.queued = True
-            self.player.set_location(location)
+            ok   = True
+            code = 0
+            msg  = ''
+            if self.verify_on_load:
+                gst.debug('Attempting to verify %s' % location)
+                if location[0:4] == 'file':
+                    try:
+                        with open(location[8:]) as f: pass
+                    except IOError as e:
+                        ok   = False
+                        code = e.errno
+                        msg  = e.strerror
+                elif location[0:4] == 'http':
+                    ans  = urlopen(location)
+                    code = ans.code
+                    msg  = ans.msg
+                    if code >= 400:
+                        ok = False
+                if ok:
+                    gst.debug('Verification succeeded!')
+            if not ok:
+                gst.warning('Failed to find %s\nWill not load. Error: %d - %s' % (location,code,msg))
+            else:
+                self.player.set_location(location)
 
     def play_toggled(self):
         if self.player.is_playing():
@@ -304,6 +328,7 @@ def main(argv):
     port      = 5555
     file_name = None
     listen    = 'zmq'
+    verify    = False
 
     # parse command line arguments
     # note: Cannot use -h/--help with gst:
@@ -311,7 +336,7 @@ def main(argv):
     #           - https://bugzilla.gnome.org/show_bug.cgi?id=549879
     arg_list = argv[1:]
     try:
-        opts, args = getopt.getopt(arg_list, "ip:f:l:", ["i", "port=", "file=", "listen="])
+        opts, args = getopt.getopt(arg_list, "ip:f:l:v", ["i", "port=", "file=", "listen=", "verify"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -325,8 +350,10 @@ def main(argv):
             file_name = arg
         elif opt in ("-l", "--listen"):
             listen = arg
+        elif opt in ("-v", "--verify"):
+            verify = True
 
-    pl = PlayerControl(listen,port)
+    pl = PlayerControl(listen,port,verify)
 
     if(file_name != None):
         pl.load_file(file_name)
