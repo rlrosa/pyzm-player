@@ -5,6 +5,7 @@
 import sys
 import zmq
 import getopt
+import logging
 
 class PyzmClient:
     """Simple command-line to zmq client for pyzm-player"""
@@ -31,9 +32,13 @@ class PyzmClient:
         """ Cleanup zmq stuff if any exists """
         print "Terminating client..."
         if(self.context != None):
+            logging.debug('Cleaning up zmq')
             if(self.sender != None):
+                logging.debug('Closing sender socket...')
                 self.sender.close()
+            logging.debug('Terminating zmq context')
             self.context.term()
+            logging.debug('zmq cleanup completed!')
 
     def quit(self):
         # cleanup is performed by self.__del__()
@@ -78,11 +83,12 @@ def main(argv):
     port      = 5555
     server    = '*'
     file_name = None
+    log_level = logging.WARN
 
     # parse command line arguments
     arg_list = argv[1:]
     try:
-        opts, args = getopt.getopt(arg_list, "ip:s:", ["info", "port=", "server="])
+        opts, args = getopt.getopt(arg_list, "ip:s:d", ["info", "port=", "server=", "debug"])
     except getopt.GetoptError:
         usage()
         sys.exit(2)
@@ -94,6 +100,9 @@ def main(argv):
             port = int(arg)
         elif opt in ("-s", "--server"):
             server = arg
+        elif opt in ("-d", "--debug"):
+            logging.root.level = logging.DEBUG
+            logging.debug('Debug output enabled')
 
     client = PyzmClient(server,port)
     client.run()
