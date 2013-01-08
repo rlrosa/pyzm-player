@@ -40,12 +40,16 @@ class PyzmClient:
             self.context.term()
             logging.debug('zmq cleanup completed!')
 
-    def quit(self):
+    def quit(self,force=False):
         # cleanup is performed by self.__del__()
+        if(force):
+            logging.debug('Discarding pending answers')
+            self.sender.setsockopt(zmq.LINGER,0)
         sys.exit(0)
 
     def run(self):
         quit_cmd = 'qqq'
+        quit_linger = 'qqqq'
         pending_acks = 0
         print "Will send stdin via zmq.\nTo quit type: %s" % quit_cmd
         while True:
@@ -59,13 +63,15 @@ class PyzmClient:
                 if socks.get(sys.stdin.fileno(), False):
                     # got stdin input
                     line = raw_input('')
-                    if line == quit_cmd:
+                    if line == quit_cmd or line == quit_linger:
+                        if(line == quit_linger):
+                            self.quit(force=True)
                         if(pending_acks==0):
                             self.quit()
                         else:
                             logging.warn('There are %d answers pending, cannot terminate '\
                                 'zmq context cleanly.\n'\
-                                'Wait for server or force quit by pressing Ctrl+C' % pending_acks)
+                                'Wait for server or force quit by typing "qqqq"' % pending_acks)
                     else:
                         self.sender.send(line, copy=True)
                         pending_acks+=1
