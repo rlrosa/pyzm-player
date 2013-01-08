@@ -17,50 +17,51 @@ import gst.interfaces
 
 import collections
 import getopt
+from time import sleep
+
+import threading
 
 import zmq
 
-class GstPlayer:
+class GstListener(threading.Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs=None, verbose=None):
+        threading.Thread.__init__(self, group=group, target=target,
+                                  name=name, verbose=verbose)
+        self.args   = args
+        self.kargs  = kwargs
+
+        # don't know how to get out of self.loop.run(), so just die
+        # when everybody else dies
+        self.daemon = True
+        return
+    def run(self):
+        self.gstBus = self.args[0]
+        self.cb  = self.args[1]
+        self.gstBus.add_signal_watch()
+        self.gstBus.connect('message', self.cb)
+        self.loop = gobject.MainLoop()
+        gst.info('Running gst listener thread')
+        self.loop.run()
+
+class GstPlayer():
     def __init__(self):
         self.playing = False
-        self.player = gst.element_factory_make("playbin", "player")
+        self.player  = gst.element_factory_make("playbin", "player")
+        self.bus     = self.player.get_bus()
 #        self.on_eos = False
 
-        bus = self.player.get_bus()
-#        bus.enable_sync_message_emission()
-        bus.add_signal_watch()
-        # bus.connect('sync-message::element', self.on_sync_message)
-        bus.connect('message', self.on_message)
-        bus.connect('message::eos',self.on_message)
-        bus.connect('message::error',self.on_message)
-
-    # def on_sync_message(self, bus, message):
-    #     if message.structure is None:
-    #         return
-    #     if message.structure.get_name() == 'prepare-xwindow-id':
-    #         # Sync with the X server before giving the X-id to the sink
-    #         gtk.gdk.threads_enter()
-    #         gtk.gdk.display_get_default().sync()
-    #         self.videowidget.set_sink(message.src)
-    #         message.src.set_property('force-aspect-ratio', True)
-    #         gtk.gdk.threads_leave()
-            
     def on_message(self, bus, message):
         t = message.type
-        print 'Message received'
         if t == gst.MESSAGE_ERROR:
             err, debug = message.parse_error()
             print "Error: %s" % err, debug
-#            if self.on_eos:
-#                self.on_eos()
-            self.playing = False
-        elif t == gst.MESSAGE_EOS:
-            print "File playback completed"
-#            if self.on_eos:
-#                self.on_eos()
             self.stop()
-            if(self.queded):
-                self.play()
+        elif t == gst.MESSAGE_EOS:
+            gst.info("File playback completed")
+            self.stop()
+            # if(self.queued):
+            #     self.play()
 
     def set_location(self, location):
         print "Loading %s", location
@@ -118,33 +119,86 @@ class GstPlayer:
     def is_playing(self):
         return self.playing
 
+class Listener(threading.Thread):
+    """Listen on src (zmq or stdin) for incomming commands"""
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs=None, verbose=None):
+        threading.Thread.__init__(self, group=group, target=target,
+                                  name=name, verbose=verbose)
+        self.args  = args
+        self.kargs = kwargs
+        self.stop_request = threading.Event()
+        return
+
+    def run(self):
+        # arg list: cb,src,port=555
+        assert(len(self.args) == 3)
+        self.threadID = 1
+        self.cb       = self.args[0]
+        self.src      = self.args[1]
+        self.port     = self.args[2]
+        self.context  = None
+        self.server   = None
+        self.name     = 'Listener'
+
+        gst.debug('%s listener thread starting....' % self.src)
+        if self.src == 'zmq':
+            # zmq_init
+            self.context = zmq.Context()
+            self.server  = self.context.socket(zmq.REP)
+            self.server.bind('tcp://*:%d' % self.port)
+            print 'zmq listener running on port %d' % self.port
+        # run loop
+        while not self.stop_request.is_set():
+            gst.info('Waiting for %s input...' % self.src)
+            if(self.src == 'zmq'):
+                msg = self.server.recv()
+                self.server.send('ack')
+            else:
+                msg = raw_input('Command:')
+            gst.info('Rx: %s' % msg)
+            self.cb(msg)
+            gst.debug('Callback exe completed')
+
+    def __del__(self):
+        gst.debug('Listener thread finished')
+
+    def join(self, timeout=None):
+        # zmq_deinit
+        self.stop_request.set()
+        if self.context != None:
+            gst.debug('Cleaning up zmq')
+            if self.server != None:
+                self.server.close()
+            self.context.term()
+
 class PlayerControl():
-    """ PlayerControl is plays mp3 files. Receives commands over zmq """
+    """
+PlayerControl is plays mp3 files.
+Receives commands over zmq or stdin.
+Usage example:
+      pl = PlayerControl('zmq',5556)
+      pl.start()
+      # now run a client and send commands, loop
+      # until client sends 'quit'.
+      while pl.is_alive():
+        sleep(0.5)
+    """
     handlers = None
-    queded = False
+    # queued = False
 
     # zmq variables
     port    = None
     context = None
     server  = None
+    src     = None
 
-    def __init__(self, port):
-
-        self.player  = GstPlayer()
-        self.port    = port
-        self.context = None
-        self.server  = None
-
-        def on_eos():
-            self.player.seek(0L)
-            self.play_toggled()
-        self.player.on_eos = lambda *x: on_eos()
-
-        self.p_position = gst.CLOCK_TIME_NONE
-        self.p_duration = gst.CLOCK_TIME_NONE
-
-        def on_delete_event():
-            self.player.stop()
+    def __init__(self, src, port=5555):
+        self.port         = port
+        self.src          = src
+        self.player       = GstPlayer()
+        self.gst_listener = GstListener(args=(self.player.bus, self.player.on_message),kwargs=[])
+        self.listener     = Listener(args=(self.handle_cmd, self.src, self.port),kwargs=[])
 
         # init callbacks
         self.handlers = collections.defaultdict(set)
@@ -159,8 +213,7 @@ class PlayerControl():
 
     def __del__(self):
         """ Cleanup zmq stuff if any exists """
-        print "Terminating server..."
-        self.zmq_deinit()
+        gst.debug("Terminating server...")
 
     def register(self, event, callback):
         self.handlers[event].add(callback)
@@ -174,8 +227,8 @@ class PlayerControl():
             sys.stderr.write("Error: Invalid URI: %s\nExpected uri"
                              "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
         else:
-            if(self.player.is_playing()):
-                self.player.queued = True
+            # if(self.player.is_playing()):
+            #     self.queued = True
             self.player.set_location(location)
 
     def play_toggled(self):
@@ -188,13 +241,6 @@ class PlayerControl():
         playing = self.player.is_playing()
         print "Player state: %s" % "Playing" if playing else "NOT Playing"
         return playing
-
-    def scale_button_press_cb(self, widget, event):
-        gst.debug('starting seek')
-
-        self.was_playing = self.player.is_playing()
-        if self.was_playing:
-            self.player.pause()
 
     def help(self):
         print "\n-- Help menu --\n\nValid commands:"
@@ -225,37 +271,23 @@ class PlayerControl():
             else:
                 self.fire(cmd)
 
-    def zmq_init(self):
-        self.context = zmq.Context()
-        self.server  = self.context.socket(zmq.REP)
-        self.server.bind('tcp://*:%d' % self.port)
+    def start(self):
+        """Starts listener threads for both gst and src (stdin,zmq)"""
+        # start gst_listener thread
+        self.gst_listener.start()
+        # start input listener thread
+        self.listener.start()
 
-    def zmq_deinit(self):
-        if self.context != None:
-            if self.server != None:
-                self.server.close()
-            self.context.term()
-
-    def run_zmq(self):
-        self.zmq_init()
-        print 'Server running, listening on zmq port %d...' % self.port
-        while True:
-            msg = self.server.recv()
-            self.server.send('ack')
-            self.handle_cmd(msg)
-
-    def run_stdin(self):
-        print 'Server running, listening on stdin...'
-        # input loop
-        cmd = 0
-        arg = 0
-        while(True):
-            line = raw_input('Command:')
-            self.handle_cmd(line)
+    def is_alive(self):
+        """Returns true if both gst and src listener threads are alive"""
+        return self.gst_listener.is_alive() and self.listener.is_alive()
 
     def quit(self):
-        # cleanup is performed by self.__del__()
-        sys.exit(0)
+        """Trigger join() on listener thread to make it terminate"""
+        gst.debug('Triggering join() on %s listener thread...' % self.src)
+        self.listener.join()
+        # don't wait, quit() is a callback within listener thread, it will
+        # never finish if we wait here.
 
 def main(argv):
 
@@ -294,15 +326,23 @@ def main(argv):
         elif opt in ("-l", "--listen"):
             listen = arg
 
-    pl = PlayerControl(port)
+    pl = PlayerControl(listen,port)
 
     if(file_name != None):
         pl.load_file(file_name)
 
-    if listen == 'stdin':
-        pl.run_stdin()
-    else:
-        pl.run_zmq()
+    print 'Starting PlayerControl...'
+    pl.start()
+
+    print 'Waiting...'
+    while pl.is_alive():
+        sleep(0.5)
+    if(not pl.listener.is_alive()):
+        gst.debug('%s listener thread died, terminating...' % pl.src)
+    if(not pl.gst_listener.is_alive()):
+        gst.debug('gst_listener thread died, terminating...')
+
+    gst.debug('Gracefully finishing...')
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
