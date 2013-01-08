@@ -11,6 +11,7 @@ class PyzmClient:
     context = None
     sender  = None
     server  = None
+    poller  = None
     port    = None
 
     def __init__(self, server, port):
@@ -19,6 +20,9 @@ class PyzmClient:
         self.context = zmq.Context()
         self.sender  = self.context.socket(zmq.REQ)
         self.sender.connect('tcp://%s:%d' % (server,port))
+        self.poller  = zmq.Poller()
+        self.poller.register(self.sender, zmq.POLLIN)
+        self.poller.register(sys.stdin, zmq.POLLIN)
 
     def __enter__(self):
         return self
@@ -37,15 +41,29 @@ class PyzmClient:
 
     def run(self):
         quit_cmd = 'qqq'
-        print "Will send stdin via zmq.\nTo quit type: %s\n" % quit_cmd
+        pending_acks = 0
+        print "Will send stdin via zmq.\nTo quit type: %s" % quit_cmd
         while True:
-            line = raw_input('Msg to send:')
-            if(line == quit_cmd):
-                self.quit()
-            self.sender.send(line)
-            print 'Waiting for recv()...',
-            ack = self.sender.recv()
-            print 'recv(): %s' % ack
+            socks = dict(self.poller.poll(500))
+            if socks:
+                if socks.get(self.sender, False):
+                    # got message from server
+                    ack = self.sender.recv()
+                    print 'recv(): %s' % ack
+                    pending_acks-=1
+                if socks.get(sys.stdin.fileno(), False):
+                    # got stdin input
+                    line = raw_input('')
+                    if line == quit_cmd:
+                        if(pending_acks==0):
+                            self.quit()
+                        else:
+                            logging.warn('There are %d answers pending, cannot terminate '\
+                                'zmq context cleanly.\n'\
+                                'Wait for server or force quit by pressing Ctrl+C' % pending_acks)
+                    else:
+                        self.sender.send(line, copy=True)
+                        pending_acks+=1
 
 def main(argv):
     def usage():
