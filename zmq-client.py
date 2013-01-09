@@ -81,7 +81,7 @@ class PyzmClient:
                         else:
                             logging.warn('There are %d answers pending, cannot terminate '\
                                 'zmq context cleanly.\n'\
-                                'Wait for server or force quit by typing "qqqq"' % pending_acks)
+                                'Wait for server or force quit by typing "%s"' % (pending_acks,quit_linger))
                     elif line:
                         try:
                             words = line.split()
