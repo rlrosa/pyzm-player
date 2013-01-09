@@ -19,6 +19,7 @@ import collections
 import getopt
 from time import sleep
 from urllib2 import urlopen
+import json
 import threading
 
 import zmq
@@ -153,24 +154,27 @@ class Listener(threading.Thread):
             gst.info('Waiting for %s input...' % self.src)
             if(self.src == 'zmq'):
                 msg = self.server.recv()
-                self.server.send('ack')
             else:
                 msg = raw_input('Command:')
             gst.info('Rx: %s' % msg)
-            self.cb(msg)
+            ans = self.cb(msg)
             gst.debug('Callback exe completed')
-
-    def __del__(self):
-        gst.debug('Listener thread finished')
-
-    def join(self, timeout=None):
+            if(self.src == 'zmq'):
+                self.server.send(ans)
+                gst.debug('Answer sent to client: %s' % ans)
         # zmq_deinit
-        self.stop_request.set()
         if self.context != None:
             gst.debug('Cleaning up zmq')
             if self.server != None:
                 self.server.close()
             self.context.term()
+
+    def __del__(self):
+        gst.debug('Listener thread finished')
+
+    def join(self, timeout=None):
+        self.stop_request.set()
+
 
 class PlayerControl():
     """
@@ -194,6 +198,14 @@ Usage example:
     src     = None
 
     def __init__(self, src, port=5555, verify_on_load=False):
+        # Return (code,msg) pairs
+        self.OK     = [200,'OK']            # OK: Generic
+        self.NK     = [400,'NK']            # NK: Generic
+        self.NK_INV = [401,'Invalid cmd']   # NK: Invalid command
+        self.NK_FAIL= [402,'cmd exe failed']# NK: Failed to execute cmd
+        self.NK_URI = [403,'Invalid URI']   # NK: Invalid URI
+        self.NK_NF  = [404,'URI not found'] # NK: URI not found
+
         self.port           = port
         self.src            = src
         self.verify_on_load = verify_on_load
@@ -204,8 +216,9 @@ Usage example:
         # init callbacks
         self.handlers = collections.defaultdict(set)
         self.register('play',self.play_toggled)
-        self.register('stop',self.player.stop)
+        self.register('stop',self.stop)
         self.register('is_playing',self.is_playing)
+        self.register('load',self.load)
         self.register('quit',self.quit)
         self.register('help',self.help)
 
@@ -221,16 +234,19 @@ Usage example:
 
     def fire(self, event, **kwargs):
         for handler in self.handlers.get(event, []):
-            handler(**kwargs)
+            return handler(**kwargs)
 
-    def load_file(self, location):
+    def load(self, location):
+        ans = list(self.OK)
         if not gst.uri_is_valid(location):
             gst.error("Error: Invalid URI: %s\nExpected uri"
                       "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
+            ans = list(self.NK_URI)
         else:
             # if(self.player.is_playing()):
             #     self.queued = True
-            ok   = True
+            gst.debug('URI is valid: %s' % location)
+            err_msg = []
             code = 0
             msg  = ''
             if self.verify_on_load:
@@ -239,61 +255,140 @@ Usage example:
                     try:
                         with open(location[8:]) as f: pass
                     except IOError as e:
-                        ok   = False
-                        code = e.errno
-                        msg  = e.strerror
+                        gst.error('Failed to open %s' % location[8:])
+                        ans = list(self.NK_NF)
+                        err_msg = 'Failed to find %s\nWill not load. Error: %d - %s' % (location,code,msg)
+                        ans.append(err_msg)
                 elif location[0:4] == 'http':
-                    ans  = urlopen(location)
-                    code = ans.code
-                    msg  = ans.msg
-                    if code >= 400:
-                        ok = False
-                if ok:
+                    try:
+                        urlopen_ans  = urlopen(location)
+                        code = urlopen_ans.code
+                        msg  = urlopen_ans.msg
+                        if code >= 400:
+                            err_msg = 'urlopen failed with %d: %s' % (code,msg)
+                    except:
+                        err_msg = 'urlopen() failed'
+                    if err_msg:
+                        ans = list(self.NK)
+                        ans.append(err_msg)
+                if not err_msg:
                     gst.debug('Verification succeeded!')
-            if not ok:
-                gst.warning('Failed to find %s\nWill not load. Error: %d - %s' % (location,code,msg))
+            if err_msg:
+                gst.warning(err_msg)
             else:
-                self.player.set_location(location)
+                gst.debug('Setting location to %s' % location)
+                try:
+                    self.player.set_location(location)
+                except:
+                    ans = list(self.NK)
+        return ans
 
     def play_toggled(self):
-        if self.player.is_playing():
-            self.player.pause()
-        else:
-            self.player.play()
+        ans = list(self.OK)
+        try:
+            if self.player.is_playing():
+                self.player.pause()
+            else:
+                self.player.play()
+        except:
+            ans = list(self.NK)
+        return ans
+
+    def stop(self):
+        """Wrapper for player.stop()"""
+        ans = list(self.OK)
+        try:
+            self.player.stop()
+        except:
+            ans = list(self.NK)
+        return ans
 
     def is_playing(self):
-        playing = self.player.is_playing()
-        print "Player state: %s" % "Playing" if playing else "NOT Playing"
-        return playing
+        """Wrapper for player.is_playing()"""
+        ans = list(self.OK)
+        try:
+            playing = self.player.is_playing()
+            if self.src == 'stdin':
+                print "Player state: Playing" if playing else "Player state: NOT Playing"
+            ans.append(playing)
+            gst.debug('is_playing:%r' % playing)
+        except:
+            ans = list(self.NK)
+        return ans
 
     def help(self):
-        print "\n-- Help menu --\n\nValid commands:"
-        for k,v in self.handlers.items():
-            print "\t%s" % k
+        ans = list(self.OK)
+        try:
+            help_msg = self.help_msg()
+            ans.append(help_msg)
+        except:
+            ans = list(self.NK)
+        return ans
+
+    def help_msg(self):
+        menu  = "\n-- Help menu --\n\nValid commands:\n\t"
+        try:
+            funcs = '\n\t'.join(self.handlers.keys())
+        except:
+            gst.error('Failed to build handler list')
+            funcs = []
+        return "%s%s" % (menu,funcs)
 
     def is_registered(self, cmd):
         return cmd in self.handlers
 
+    def json_ans(self, in_msg, code, msg, data=[]):
+        ans = [
+            {
+                'ack':
+                    {'code':code,
+                     'msg':msg,
+                     'input':in_msg},
+                'data':
+                    data
+             }
+            ]
+        data_string = json.dumps(ans)
+        return data_string
+
     def handle_cmd(self, msg):
         """Receives a msg and executes it if it corresponds to a registered cmd"""
         words = msg.split()
-        in_len = len(words)
-        if in_len == 2 and words[0] == 'load':
-            # must be new file
-            new_file = words[1]
-            if (gst.uri_is_valid(new_file)):
-                # load new file
-                self.load_file(new_file)
-            else:
-                sys.stderr.write("Error: Invalid URI: %s\nIgnoring..." % new_file)
-        elif (in_len == 1):
-            # update command (play, pause, etc)
-            cmd = words[0]
-            if not self.is_registered(cmd):
-                sys.stderr.write("Error: Invalid command: %s, Ignoring...\n" % cmd)
-                self.help()
-            else:
-                self.fire(cmd)
+        cmd   = words[0]
+        args  = []
+        ans   = list(self.OK)
+        if(len(words)>1):
+            args = words[1]
+
+        if not self.is_registered(cmd):
+            gst.error("Error: Invalid command: %s, Ignoring...\n" % cmd)
+            help_msg = self.help_msg()
+            if(self.src == 'stdin'):
+                print help_msg
+            ans = list(self.NK_INV)
+            ans.append(help_msg)
+        else:
+            try:
+                if(args):
+                    gst.debug('Executing cmd=%s with args=%s' % (cmd,args))
+                    assert(cmd == 'load')
+                    ans = list(self.load(args))
+                    #TODO implement generic
+                    # ans = self.fire(cmd,args)
+                else:
+                    gst.debug('Executing cmd=%s without args' % cmd)
+                    ans = list(self.fire(cmd))
+            except Exception, e:
+                gst.error('cmd execution failed: %s. Exception:%s' % (msg,e))
+                ans = list(self.NK_FAIL)
+
+        # Take cmd result and prepare answer to send to client
+        gst.debug('ans(len=%d)=%s' % (len(ans),ans))
+        assert(len(ans) == 2 or len(ans) == 3) # (code, code descrip, data, input cmd)
+        data = []
+        if len(ans) == 3:
+            data = ans[2]
+        return self.json_ans(msg, ans[0], ans[1], data)
 
     def start(self):
         """Starts listener threads for both gst and src (stdin,zmq)"""
@@ -308,10 +403,15 @@ Usage example:
 
     def quit(self):
         """Trigger join() on listener thread to make it terminate"""
-        gst.debug('Triggering join() on %s listener thread...' % self.src)
-        self.listener.join()
-        # don't wait, quit() is a callback within listener thread, it will
-        # never finish if we wait here.
+        ans = list(self.OK)
+        try:
+            gst.debug('Triggering join() on %s listener thread...' % self.src)
+            self.listener.join()
+            # don't wait, quit() is a callback within listener thread, it will
+            # never finish if we wait here.
+        except:
+            ans = list(self.NK)
+        return ans
 
 def main(argv):
 
@@ -357,7 +457,7 @@ def main(argv):
     pl = PlayerControl(listen,port,verify)
 
     if(file_name != None):
-        pl.load_file(file_name)
+        pl.load(file_name)
 
     print 'Starting PlayerControl...'
     pl.start()

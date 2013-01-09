@@ -6,6 +6,7 @@ import sys
 import zmq
 import getopt
 import logging
+import json
 
 class PyzmClient:
     """Simple command-line to zmq client for pyzm-player"""
@@ -58,7 +59,15 @@ class PyzmClient:
                 if socks.get(self.sender, False):
                     # got message from server
                     ack = self.sender.recv()
-                    print 'recv(): %s' % ack
+                    logging.debug('Raw data:%s' % ack)
+                    try:
+                        dec = json.loads(ack)
+                        print 'DECODED:',json.dumps(dec,indent=2)
+                        data = dec[0]['data']
+                        if data:
+                            print 'DATA:',data
+                    except:
+                        print 'ERROR: failed to decode json. Raw data:\n%s' % ack
                     pending_acks-=1
                 if socks.get(sys.stdin.fileno(), False):
                     # got stdin input
