@@ -178,7 +178,7 @@ class Listener(threading.Thread):
 
 class PlayerControl():
     """
-PlayerControl is plays mp3 files.
+PlayerControl plays mp3 files.
 Receives commands over zmq or stdin.
 Usage example:
       pl = PlayerControl('zmq',5556)
