@@ -15,7 +15,7 @@ cmd_id_name = {
     0: 'invalid',
     1: 'play',
     2: 'stop',
-    3: 'is_playing',
+    3: 'status',
     4: 'load',
     10:'help',
     11:'quit',

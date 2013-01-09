@@ -212,7 +212,7 @@ Usage example:
         self.handlers = collections.defaultdict(set)
         self.register('play',self.play)
         self.register('stop',self.stop)
-        self.register('is_playing',self.is_playing)
+        self.register('status',self.status)
         self.register('load',self.load)
         self.register('quit',self.quit)
         self.register('help',self.help)
@@ -238,7 +238,7 @@ Usage example:
                       "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
             ans = [403]
         else:
-            # if(self.player.is_playing()):
+            # if(self.player.status()):
             #     self.queued = True
             gst.debug('URI is valid: %s' % location)
             err_msg = []
@@ -281,7 +281,7 @@ Usage example:
     def play(self):
         ans = [200]
         try:
-            if self.player.is_playing():
+            if self.player.status():
                 self.player.pause()
             else:
                 self.player.play()
@@ -298,7 +298,7 @@ Usage example:
             ans = [400]
         return ans
 
-    def is_playing(self):
+    def status(self):
         """Wrapper for player.is_playing()"""
         ans = [200]
         try:
@@ -306,7 +306,7 @@ Usage example:
             if self.src == 'stdin':
                 print "Player state: Playing" if playing else "Player state: NOT Playing"
             ans.append(playing)
-            gst.debug('is_playing:%r' % playing)
+            gst.debug('status:%r' % playing)
         except:
             ans = [400]
         return ans
