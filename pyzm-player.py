@@ -298,16 +298,29 @@ Usage example:
             ans = [400]
         return ans
 
-    def status(self):
+    def is_playing(self):
         """Wrapper for player.is_playing()"""
-        ans = [200]
+        playing = False
         try:
             playing = self.player.is_playing()
             if self.src == 'stdin':
                 print "Player state: Playing" if playing else "Player state: NOT Playing"
-            ans.append(playing)
             gst.debug('status:%r' % playing)
-        except:
+        except Exception as e:
+            print e
+            gst.error('Problem near is_playing()')
+        return playing
+
+    def status(self):
+        """Get player playing/!playing"""
+        #TODO return metadata if playing
+        ans = [200]
+        try:
+            playing = self.is_playing()
+            ans.append(True) if playing else ans.append(False)
+        except Exception as e:
+            print e
+            gst.error('Problem near status()')
             ans = [400]
         return ans
 
