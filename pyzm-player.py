@@ -384,7 +384,7 @@ Usage example:
 
         # Take cmd result and prepare answer to send to client
         gst.debug('ans(len=%d)=%s' % (len(ans),ans))
-        assert(len(ans) == 2 or len(ans) == 3) # (code, code descrip, data, input cmd)
+        assert(len(ans) == 2 or len(ans) == 3) # (code, code descrip, data)
         data = []
         if len(ans) == 3:
             data = ans[2]
