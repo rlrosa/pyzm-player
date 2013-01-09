@@ -286,7 +286,7 @@ Usage example:
             else:
                 self.player.play()
         except:
-            ans = list(self.NK)
+            ans = [400]
         return ans
 
     def stop(self):
