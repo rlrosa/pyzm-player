@@ -7,6 +7,7 @@ import zmq
 import getopt
 import logging
 import json
+from shared import cmd_id_name, cmd_name_id, r_codes
 
 class PyzmClient:
     """Simple command-line to zmq client for pyzm-player"""
@@ -81,9 +82,17 @@ class PyzmClient:
                             logging.warn('There are %d answers pending, cannot terminate '\
                                 'zmq context cleanly.\n'\
                                 'Wait for server or force quit by typing "qqqq"' % pending_acks)
-                    else:
-                        self.sender.send(line, copy=True)
-                        pending_acks+=1
+                    elif line:
+                        try:
+                            words = line.split()
+                            msg   = '%s %s' % (line,cmd_name_id[words[0]])
+                            try:
+                                self.sender.send(msg, copy=True)
+                                pending_acks+=1
+                            except Exception as e:
+                                logging.error('Failed to send "%s" via zmq!' % msg)
+                        except Exception as e:
+                            logging.error('Command Id for %s not found!' % e)
 
 def main(argv):
     def usage():

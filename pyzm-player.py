@@ -24,6 +24,9 @@ import threading
 
 import zmq
 
+# defs, etc
+from shared import r_codes,cmd_id_name,cmd_name_id
+
 class GstListener(threading.Thread):
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, verbose=None):
@@ -198,14 +201,6 @@ Usage example:
     src     = None
 
     def __init__(self, src, port=5555, verify_on_load=False):
-        # Return (code,msg) pairs
-        self.OK     = [200,'OK']            # OK: Generic
-        self.NK     = [400,'NK']            # NK: Generic
-        self.NK_INV = [401,'Invalid cmd']   # NK: Invalid command
-        self.NK_FAIL= [402,'cmd exe failed']# NK: Failed to execute cmd
-        self.NK_URI = [403,'Invalid URI']   # NK: Invalid URI
-        self.NK_NF  = [404,'URI not found'] # NK: URI not found
-
         self.port           = port
         self.src            = src
         self.verify_on_load = verify_on_load
@@ -215,7 +210,7 @@ Usage example:
 
         # init callbacks
         self.handlers = collections.defaultdict(set)
-        self.register('play',self.play_toggled)
+        self.register('play',self.play)
         self.register('stop',self.stop)
         self.register('is_playing',self.is_playing)
         self.register('load',self.load)
@@ -237,11 +232,11 @@ Usage example:
             return handler(**kwargs)
 
     def load(self, location):
-        ans = list(self.OK)
+        ans = [200]
         if not gst.uri_is_valid(location):
             gst.error("Error: Invalid URI: %s\nExpected uri"
                       "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
-            ans = list(self.NK_URI)
+            ans = [403]
         else:
             # if(self.player.is_playing()):
             #     self.queued = True
@@ -256,7 +251,7 @@ Usage example:
                         with open(location[8:]) as f: pass
                     except IOError as e:
                         gst.error('Failed to open %s' % location[8:])
-                        ans = list(self.NK_NF)
+                        ans = [404]
                         err_msg = 'Failed to find %s\nWill not load. Error: %d - %s' % (location,code,msg)
                         ans.append(err_msg)
                 elif location[0:4] == 'http':
@@ -269,7 +264,7 @@ Usage example:
                     except:
                         err_msg = 'urlopen() failed'
                     if err_msg:
-                        ans = list(self.NK)
+                        ans = [400]
                         ans.append(err_msg)
                 if not err_msg:
                     gst.debug('Verification succeeded!')
@@ -280,11 +275,11 @@ Usage example:
                 try:
                     self.player.set_location(location)
                 except:
-                    ans = list(self.NK)
+                    ans = [400]
         return ans
 
-    def play_toggled(self):
-        ans = list(self.OK)
+    def play(self):
+        ans = [200]
         try:
             if self.player.is_playing():
                 self.player.pause()
@@ -296,16 +291,16 @@ Usage example:
 
     def stop(self):
         """Wrapper for player.stop()"""
-        ans = list(self.OK)
+        ans = [200]
         try:
             self.player.stop()
         except:
-            ans = list(self.NK)
+            ans = [400]
         return ans
 
     def is_playing(self):
         """Wrapper for player.is_playing()"""
-        ans = list(self.OK)
+        ans = [200]
         try:
             playing = self.player.is_playing()
             if self.src == 'stdin':
@@ -313,16 +308,16 @@ Usage example:
             ans.append(playing)
             gst.debug('is_playing:%r' % playing)
         except:
-            ans = list(self.NK)
+            ans = [400]
         return ans
 
     def help(self):
-        ans = list(self.OK)
+        ans = [200]
         try:
             help_msg = self.help_msg()
             ans.append(help_msg)
         except:
-            ans = list(self.NK)
+            ans = [400]
         return ans
 
     def help_msg(self):
@@ -337,13 +332,12 @@ Usage example:
     def is_registered(self, cmd):
         return cmd in self.handlers
 
-    def json_ans(self, in_msg, code, msg, data=[]):
+    def json_ans(self, cmd_code, res_code, data=[]):
         ans = [
             {
                 'ack':
-                    {'code':code,
-                     'msg':msg,
-                     'input':in_msg},
+                    {'res_code':res_code,
+                     'cmd_code':cmd_code},
                 'data':
                     data
              }
@@ -353,42 +347,67 @@ Usage example:
 
     def handle_cmd(self, msg):
         """Receives a msg and executes it if it corresponds to a registered cmd"""
-        words = msg.split()
-        cmd   = words[0]
-        args  = []
-        ans   = list(self.OK)
-        if(len(words)>1):
-            args = words[1]
+        words       = msg.split()
+        cmd         = words[0]
+        cmd_code    = words[-1]
+        cmd_code_dic= 0
+        args        = []
+        ans         = [200] # default to OK
 
-        if not self.is_registered(cmd):
+        if not self.is_registered(cmd) or len(words) < 2:
             gst.error("Error: Invalid command: %s, Ignoring...\n" % cmd)
             help_msg = self.help_msg()
             if(self.src == 'stdin'):
                 print help_msg
-            ans = list(self.NK_INV)
+            ans = [401]
             ans.append(help_msg)
         else:
+            # first arg is command name, last is cmd if
+            args = words[1:-1]
             try:
-                if(args):
-                    gst.debug('Executing cmd=%s with args=%s' % (cmd,args))
-                    assert(cmd == 'load')
-                    ans = list(self.load(args))
-                    #TODO implement generic
-                    # ans = self.fire(cmd,args)
-                else:
-                    gst.debug('Executing cmd=%s without args' % cmd)
-                    ans = list(self.fire(cmd))
-            except Exception, e:
-                gst.error('cmd execution failed: %s. Exception:%s' % (msg,e))
-                ans = list(self.NK_FAIL)
+                # get command id from dict, compare with rx id (must match)
+                gst.debug('Matching command id with dict values...')
+                cmd_code_dic = cmd_name_id[cmd]
+                try:
+                    # convert from string to int
+                    cmd_code = int(cmd_code)
+                    # check matching
+                    if cmd_code_dic != cmd_code:
+                        gst.error('Command code received %d does not match dict %d'
+                                    % (cmd_code,cmd_code_dic))
+                    else:
+                        gst.debug('Command id matched!')
+                    try:
+                        if(args):
+                            gst.debug('Executing cmd=%s with args=%s' % (cmd,args))
+                            assert(cmd == 'load')
+                            args = args[0]
+                            ans = list(self.load(args))
+                            #TODO implement generic multi arg command and support for multi load (queue)
+                            # ans = self.fire(cmd,args)
+                        else:
+                            gst.debug('Executing cmd=%s without args' % cmd)
+                            ans = list(self.fire(cmd))
+                    except ValueError as ve:
+                        print 'Exception:',ve
+                    except Exception, e:
+                        print 'Exception:',e
+                        gst.error('Problem near cmd execution: %s' % msg)
+                        ans = [402]
+                except Exception as e:
+                    print 'Exception:',e
+                    gst.error('Problem near command id matching: (rx,dict)=(%d,%d)' % (cmd_code,cmd_code_dic))
+            except Exception as e:
+                print 'Exception:',e
+                gst.error('Problem near: find Id for cmd: %s' % cmd)
 
         # Take cmd result and prepare answer to send to client
         gst.debug('ans(len=%d)=%s' % (len(ans),ans))
-        assert(len(ans) == 2 or len(ans) == 3) # (code, code descrip, data)
+        assert(len(ans) == 1 or len(ans) == 2) # (code, data)
         data = []
-        if len(ans) == 3:
-            data = ans[2]
-        return self.json_ans(msg, ans[0], ans[1], data)
+        if len(ans) == 2:
+            data = ans[1]
+        return self.json_ans(cmd_code, ans[0], data)
 
     def start(self):
         """Starts listener threads for both gst and src (stdin,zmq)"""
@@ -403,14 +422,14 @@ Usage example:
 
     def quit(self):
         """Trigger join() on listener thread to make it terminate"""
-        ans = list(self.OK)
+        ans = [200]
         try:
             gst.debug('Triggering join() on %s listener thread...' % self.src)
             self.listener.join()
             # don't wait, quit() is a callback within listener thread, it will
             # never finish if we wait here.
         except:
-            ans = list(self.NK)
+            ans = [400]
         return ans
 
 def main(argv):
