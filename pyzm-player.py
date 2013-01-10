@@ -477,8 +477,6 @@ Usage example:
             queue_moved = abs(queue_pos_new - queue_pos_old)
 
             gst.debug('Will set new location')
-            print 'queue:',self.queue
-            print 'queue[%d]:' % queue_pos_new,self.queue[queue_pos_new]
             self.player.set_location(self.queue[queue_pos_new])
             # update queue position
             self.queue_pos = queue_pos_new
