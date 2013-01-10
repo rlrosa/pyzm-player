@@ -6,6 +6,7 @@ import pygtk
 pygtk.require('2.0')
 
 import sys
+import os
 
 import gobject
 gobject.threads_init()
@@ -221,6 +222,8 @@ Usage example:
         self.register('stop',self.stop)
         self.register('status',self.status)
         self.register('queue_add',self.queue_add)
+        self.register('queue_next',self.queue_next)
+        self.register('queue_prev',self.queue_prev)
         self.register('quit',self.quit)
         self.register('help',self.help)
 
@@ -240,6 +243,7 @@ Usage example:
 
     def queue_add(self, location):
         ans = [200]
+        is_dir = False
         if not gst.uri_is_valid(location):
             gst.error("Error: Invalid URI: %s\nExpected uri"
                       "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
@@ -254,13 +258,35 @@ Usage example:
             if self.verify_on_load:
                 gst.debug('Attempting to verify %s' % location)
                 if location[0:4] == 'file':
+                    path = location[7:]
                     try:
-                        with open(location[8:]) as f: pass
+                        with open(path) as f: pass
                     except IOError as e:
-                        gst.error('Failed to open %s' % location[8:])
-                        ans = [404]
-                        err_msg = 'Failed to find %s\nWill not load. Error: %d - %s' % (location,code,msg)
-                        ans.append(err_msg)
+                        if e.errno == 21:
+                            is_dir = True
+                            loaded = []
+                            try:
+                                # is directory, load content
+                                os.chdir(path)
+                                for f in os.listdir('.'):
+                                    if f.endswith('.mp3'):
+                                        full_path = location+'/'+f
+                                        res = self.queue_add(full_path)
+                                        if res[0] == 200:
+                                            loaded.append(full_path)
+                                ans.append(loaded)
+                            except IOError as e:
+                                err_msg = 'Error parsing directory, will'\
+                                    'stop loading, exception:%s' % e.__str__()
+                                gst.error(err_msg)
+                                ans = [404]
+                                ans.append(err_msg)
+                        else:
+                            err_msg = 'Will not load, exception when opening'\
+                                '%s: %s' % (path,e.__str__())
+                            gst.error(err_msg)
+                            ans = [404]
+                            ans.append(err_msg)
                 elif location[0:4] == 'http':
                     try:
                         urlopen_ans  = urlopen(location)
@@ -277,7 +303,7 @@ Usage example:
                     gst.debug('Verification succeeded!')
             if err_msg:
                 gst.warning(err_msg)
-            else:
+            elif not is_dir:
                 gst.debug('Setting location to %s' % location)
                 try:
                     self.queue.append(location)
