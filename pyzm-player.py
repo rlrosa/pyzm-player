@@ -210,7 +210,7 @@ Usage example:
         self.port           = port
         self.src            = src
         self.verify_on_load = verify_on_load
-        self.player         = GstPlayer(self.next)
+        self.player         = GstPlayer(self.queue_next)
         self.gst_listener   = GstListener(args=(self.player.bus, self.player.on_message),kwargs=[])
         self.listener       = Listener(args=(self.handle_cmd, self.src, self.port),kwargs=[])
         self.queue          = list()
@@ -222,6 +222,7 @@ Usage example:
         self.register('stop',self.stop)
         self.register('status',self.status)
         self.register('queue_add',self.queue_add)
+        self.register('queue_del',self.queue_del)
         self.register('queue_next',self.queue_next)
         self.register('queue_prev',self.queue_prev)
         self.register('quit',self.quit)
@@ -307,15 +308,67 @@ Usage example:
                 gst.debug('Setting location to %s' % location)
                 try:
                     self.queue.append(location)
-                    gst.debug('Current queue:\n%s' % '\t\n'.join(self.queue))
+                    gst.debug('Current queue:\n\t%s' % '\n\t'.join(self.queue))
                     if self.queue_pos == -1:
                         gst.debug('New queue, will next()')
-                        self.next()
-                        gst.debug('New queue play success!')
+                        ans_n = self.queue_next()
+                        if ans_n[0] == 200:
+                            gst.debug('New queue play success!')
+                        else:
+                            ans = [400]
+                            ans.append('Failed to set initial queue position')
                 except Exception as e:
                     print e
                     ans = [400]
                     gst.error('Problem near queue.append()')
+        return ans
+
+    def queue_del(self,uri=None,pos=-1):
+        """Remove an item from the queue. Item can be selected
+        either by URI or by pos (position) in the queue.
+
+        Removing the currently playing element will not stop playback.
+        """
+        ans = [200]
+        ind = -1
+        if uri:
+            try:
+                ind = self.queue.index(uri)
+                self.queue.remove(uri)
+                ans.append('Removed element %s' % uri)
+            except ValueError as e:
+                err_msg = 'Exception:%s' % e.__str__()
+                gst.warning(err_msg)
+                ans = [400]
+                ans.append(err_msg)
+        elif pos >= 0:
+            try:
+                ind = pos
+                del self.queue[pos]
+                ans.append('Removed element at queue[%d]' % pos)
+            except IndexError as e:
+                err_msg = 'Failed to remove at %d. Exception:%s' % (pos,e.__str__())
+                gst.warning(err_msg)
+                ans = [400]
+                ans.append(err_msg)
+        try:
+            if ans[0] == 200:
+                if ind < self.queue_pos:
+                    # update queue_pos to new queue size
+                    self.queue_pos -= 1
+                elif ind == self.queue_pos:
+                    # check if currently selected item was deleted
+                    self.queue_pos -= 1
+                    if self.queue_pos >= 0:
+                        self.player.set_location(self.queue[self.queue_pos])
+        except Exception as e:
+            print e
+            err_msg = 'Problem near update queue_pos. Exception:%s' % e.__str__()
+            gst.error(err_msg)
+            ans = [400]
+            ans.append(err_msg)
+        if ans[0] == 200 and len(ans) > 1:
+            gst.debug('Updated queue:\n\t%s' % '\n\t'.join(self.queue))
         return ans
 
     def queue_next(self,step=1):
@@ -323,9 +376,9 @@ Usage example:
         protocol overhead"""
         ans = [400]
         try:
-            gst.debug('Will next(%d)' % step)
-            ok,moved = self.next(step)
-            gst.debug('next(%d) returned (%f,%d)' % (step,ok,moved))
+            gst.debug('Will next_prev(%d)' % step)
+            ok,moved = self.next_prev(step)
+            gst.debug('next_prev(%d) returned (%f,%d)' % (step,ok,moved))
             if ok:
                 ans = [200]
                 ans.append(moved)
@@ -333,18 +386,6 @@ Usage example:
             print e
             gst.error('Problem near queue_next()')
         return ans
-
-    def next(self,step=1):
-        ok    = False
-        moved = 0
-        if step <= 0:
-            return ok,moved
-        try:
-            return self.next_prev(step)
-        except Exception as e:
-            print e
-            gst.error('Problem near queue_next()')
-        return ok,moved
 
     def queue_prev(self,step=-1):
         ans = [400]
@@ -528,9 +569,19 @@ Usage example:
                     try:
                         if(args):
                             gst.debug('Executing cmd=%s with args=%s' % (cmd,args))
-                            assert(cmd == 'queue_add')
                             args = args[0]
-                            ans = list(self.queue_add(args))
+                            if cmd == 'queue_add':
+                                ans = list(self.queue_add(args))
+                            elif cmd == 'queue_del':
+                                param = -1
+                                try:
+                                    param = int(args)
+                                except ValueError as e:
+                                    gst.debug('Param is not int. Exception:%s' % e.__str__())
+                                if not param == -1:
+                                    ans = list(self.queue_del(pos=param))
+                                else:
+                                    ans = list(self.queue_del(uri=args))
                             #TODO implement generic multi arg command and support for multi load (queue)
                             # ans = self.fire(cmd,args)
                         else:
