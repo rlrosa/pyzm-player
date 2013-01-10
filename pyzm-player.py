@@ -68,7 +68,7 @@ class GstPlayer():
             #     self.play()
 
     def set_location(self, location):
-        print "Loading %s", location
+        print "Loading %s" % location
         self.player.set_property('uri', location)
 
     def query_position(self):
