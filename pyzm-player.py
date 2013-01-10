@@ -20,13 +20,12 @@ import collections
 import getopt
 from time import sleep
 from urllib2 import urlopen
-import json
 import threading
 
 import zmq
 
 # defs, etc
-from shared import r_codes,cmd_id_name,cmd_name_id
+import shared
 
 class GstListener(threading.Thread):
     def __init__(self, group=None, target=None, name=None,
@@ -570,29 +569,21 @@ Usage example:
     def is_registered(self, cmd):
         return cmd in self.handlers
 
-    def json_ans(self, cmd_code, res_code, data=[]):
-        ans = [
-            {
-                'ack':
-                    {'res_code':res_code,
-                     'cmd_code':cmd_code},
-                'data':
-                    data
-             }
-            ]
-        data_string = json.dumps(ans)
-        return data_string
-
     def handle_cmd(self, msg):
         """Receives a msg and executes it if it corresponds to a registered cmd"""
-        words       = msg.split()
-        cmd         = words[0]
-        cmd_code    = words[-1]
+        if self.src == 'zmq':
+            cmd,cmd_code,args = shared.json_server_dec(msg)
+            gst.debug('dec: cmd_name=%s,'\
+                          'cmd_code=%d,args=%s' % (cmd,cmd_code,args.__str__()))
+        else:
+            words       = msg.split()
+            cmd         = words[0]
+            cmd_code    = words[-1]
+            args        = []
         cmd_code_dic= 0
-        args        = []
         ans         = [200] # default to OK
 
-        if not self.is_registered(cmd) or len(words) < 2:
+        if not self.is_registered(cmd) or (self.src == 'stdin' and len(words) < 2):
             gst.error("Error: Invalid command: %s, Ignoring...\n" % cmd)
             help_msg = self.help_msg()
             if(self.src == 'stdin'):
@@ -601,14 +592,20 @@ Usage example:
             ans.append(help_msg)
         else:
             # first arg is command name, last is cmd if
-            args = words[1:-1]
-            try:
-                # get command id from dict, compare with rx id (must match)
-                gst.debug('Matching command id with dict values...')
-                cmd_code_dic = cmd_name_id[cmd]
+            if self.src == 'stdin':
+                # if src is zmq, then json_server_dec() took
+                # care of fetching arguments for command
+                args = words[1:-1]
                 try:
                     # convert from string to int
                     cmd_code = int(cmd_code)
+                except ValueError as e:
+                    gst.warning('int(cmd_code) failed!Exception:%s' % e.__str__())
+            try:
+                # get command id from dict, compare with rx id (must match)
+                gst.debug('Matching command id with dict values...')
+                cmd_code_dic = shared.cmd_name_id[cmd]
+                try:
                     # check matching
                     if cmd_code_dic != cmd_code:
                         gst.error('Command code received %d does not match dict %d'
@@ -655,7 +652,7 @@ Usage example:
         data = []
         if len(ans) == 2:
             data = ans[1]
-        return self.json_ans(cmd_code, ans[0], data)
+        return shared.json_server_enc(cmd_code, ans[0], data)
 
     def start(self):
         """Starts listener threads for both gst and src (stdin,zmq)"""

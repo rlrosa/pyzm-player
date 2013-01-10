@@ -7,7 +7,7 @@ import zmq
 import getopt
 import logging
 import json
-from shared import cmd_id_name, cmd_name_id, r_codes
+import shared
 
 class PyzmClient:
     """Simple command-line to zmq client for pyzm-player"""
@@ -53,7 +53,11 @@ class PyzmClient:
         quit_cmd = 'qqq'
         quit_linger = 'qqqq'
         pending_acks = 0
-        print "Will send stdin via zmq.\nTo quit type: %s" % quit_cmd
+        print "Will send stdin via zmq.\n"\
+            "Example:\n"\
+            "\tplay file:///tmp/audio1.mp3,file:///tmp/audio2.mp3\n"\
+            "\tstop\n\n"\
+            "To quit type: %s" % quit_cmd
         while True:
             socks = dict(self.poller.poll(500))
             if socks:
@@ -62,9 +66,9 @@ class PyzmClient:
                     ack = self.sender.recv()
                     logging.debug('Raw data:%s' % ack)
                     try:
-                        dec = json.loads(ack)
+                        cmd_code,cmd_res,data,dec = shared.json_client_dec(ack)
+                        logging.debug('will json.dumps to print data on screen')
                         print 'DECODED:',json.dumps(dec,indent=2)
-                        data = dec[0]['data']
                         if data:
                             print 'DATA:',data
                     except:
@@ -85,14 +89,23 @@ class PyzmClient:
                     elif line:
                         try:
                             words = line.split()
-                            msg   = '%s %s' % (line,cmd_name_id[words[0]])
+                            cmd_name = words[0]
+                            args = []
+                            # now fetch args
+                            if(len(words) > 1):
+                                args = ' '.join(words[1:]).split(',')
                             try:
-                                self.sender.send(msg, copy=True)
-                                pending_acks+=1
+                                msg = shared.json_client_enc(cmd_name,args)
+                                try:
+                                    self.sender.send(msg, copy=True)
+                                    pending_acks+=1
+                                except Exception as e:
+                                    logging.error('Failed to send "%s" via zmq!'\
+                                                      'Exception:%s' % (msg,e.__str__()))
                             except Exception as e:
-                                logging.error('Failed to send "%s" via zmq!' % msg)
+                                logging.error('Failed encode json msg. Exception:%s' % e.__str__())
                         except Exception as e:
-                            logging.error('Command Id for %s not found!' % e)
+                            logging.error('Exception:' % e.__str__())
 
 def main(argv):
     def usage():
