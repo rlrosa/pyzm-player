@@ -49,11 +49,11 @@ class GstListener(threading.Thread):
         self.loop.run()
 
 class GstPlayer():
-    def __init__(self):
+    def __init__(self, cb_eos=None):
         self.playing = False
         self.player  = gst.element_factory_make("playbin", "player")
         self.bus     = self.player.get_bus()
-#        self.on_eos = False
+        self.cb_eos = cb_eos if not None else self.stop()
 
     def on_message(self, bus, message):
         t = message.type
@@ -63,7 +63,11 @@ class GstPlayer():
             self.stop()
         elif t == gst.MESSAGE_EOS:
             gst.info("File playback completed")
-            self.stop()
+            ok,moved = self.cb_eos()
+            if ok:
+                gst.debug('eos callback completed, moved queue %d places' % moved)
+            else:
+                gst.warning('eos callback failed!')
             # if(self.queued):
             #     self.play()
 
@@ -192,7 +196,8 @@ Usage example:
         sleep(0.5)
     """
     handlers = None
-    # queued = False
+    queue    = None
+    queue_pos= None
 
     # zmq variables
     port    = None
@@ -204,16 +209,18 @@ Usage example:
         self.port           = port
         self.src            = src
         self.verify_on_load = verify_on_load
-        self.player         = GstPlayer()
+        self.player         = GstPlayer(self.next)
         self.gst_listener   = GstListener(args=(self.player.bus, self.player.on_message),kwargs=[])
         self.listener       = Listener(args=(self.handle_cmd, self.src, self.port),kwargs=[])
+        self.queue          = list()
+        self.queue_pos      = -1
 
         # init callbacks
         self.handlers = collections.defaultdict(set)
         self.register('play',self.play)
         self.register('stop',self.stop)
         self.register('status',self.status)
-        self.register('load',self.load)
+        self.register('queue_add',self.queue_add)
         self.register('quit',self.quit)
         self.register('help',self.help)
 
@@ -231,7 +238,7 @@ Usage example:
         for handler in self.handlers.get(event, []):
             return handler(**kwargs)
 
-    def load(self, location):
+    def queue_add(self, location):
         ans = [200]
         if not gst.uri_is_valid(location):
             gst.error("Error: Invalid URI: %s\nExpected uri"
@@ -273,17 +280,118 @@ Usage example:
             else:
                 gst.debug('Setting location to %s' % location)
                 try:
-                    self.player.set_location(location)
-                except:
+                    self.queue.append(location)
+                    gst.debug('Current queue:\n%s' % '\t\n'.join(self.queue))
+                    if self.queue_pos == -1:
+                        gst.debug('New queue, will next()')
+                        self.next()
+                        gst.debug('New queue play success!')
+                except Exception as e:
+                    print e
                     ans = [400]
+                    gst.error('Problem near queue.append()')
         return ans
+
+    def queue_next(self,step=1):
+        """Wrapper for client call to next(), adds client-server
+        protocol overhead"""
+        ans = [400]
+        try:
+            gst.debug('Will next(%d)' % step)
+            ok,moved = self.next(step)
+            gst.debug('next(%d) returned (%f,%d)' % (step,ok,moved))
+            if ok:
+                ans = [200]
+                ans.append(moved)
+        except Exception as e:
+            print e
+            gst.error('Problem near queue_next()')
+        return ans
+
+    def next(self,step=1):
+        ok    = False
+        moved = 0
+        if step <= 0:
+            return ok,moved
+        try:
+            return self.next_prev(step)
+        except Exception as e:
+            print e
+            gst.error('Problem near queue_next()')
+        return ok,moved
+
+    def queue_prev(self,step=-1):
+        ans = [400]
+        if step >= 0:
+            return ans
+        try:
+            ok,moved = self.next_prev(step)
+            if ok:
+                ans = [200]
+                ans.append(moved)
+        except Exception as e:
+            print e
+            gst.error('Problem near queue_prev()')
+        return ans
+
+    def next_prev(self, step):
+        """Move queue step positions (next,back)
+        Returns a tuple (ok,queue_moved), where
+        the value queue_moved indicates number of postions
+        shifted by queue_move(), and is valid only if ok==True
+        """
+        ans         = False
+        queue_moved = 0
+        if(step == 0):
+            # come on...
+            return ans,queue_moved
+        try:
+            queue_pos_old   = self.queue_pos
+            queue_pos_new   = self.queue_pos + step
+            queue_finished  = False
+            # Verify index is within limits, stop if out of boundries
+            # This is the typical behaviour of mp3 playing software
+            # such as Rhythmbox.
+            if queue_pos_new < 0 or queue_pos_new >= len(self.queue):
+                gst.debug('queue playback completed, will stop and return to first element')
+                # queue completed, stop player and return
+                queue_pos_new  = 0
+                queue_finished = True
+            queue_moved = abs(queue_pos_new - queue_pos_old)
+
+            gst.debug('Will set new location')
+            print 'queue:',self.queue
+            print 'queue[%d]:' % queue_pos_new,self.queue[queue_pos_new]
+            self.player.set_location(self.queue[queue_pos_new])
+            # update queue position
+            self.queue_pos = queue_pos_new
+            gst.debug('New queue_pos:%d/%d' % (self.queue_pos, len(self.queue)))
+            try:
+                if(self.is_playing()):
+                    gst.debug('Will stop+play to advance in queue')
+                    self.stop()
+                    if queue_finished:
+                        gst.debug('Omiting play(), queue finished')
+                    else:
+                        self.play()
+                # Mark success
+                ans = True
+            except Exception as e:
+                print e
+                gst.error('Failed to advance in queue')
+        except Exception as e:
+            print e
+            gst.error('Problem near next()')
+        return ans,queue_moved
 
     def play(self):
         ans = [200]
         try:
-            if self.player.status():
+            if self.is_playing():
+                gst.debug('Will pause player')
                 self.player.pause()
             else:
+                gst.debug('Will play player')
                 self.player.play()
         except:
             ans = [400]
@@ -293,6 +401,7 @@ Usage example:
         """Wrapper for player.stop()"""
         ans = [200]
         try:
+            gst.debug('Will stop player')
             self.player.stop()
         except:
             ans = [400]
@@ -393,9 +502,9 @@ Usage example:
                     try:
                         if(args):
                             gst.debug('Executing cmd=%s with args=%s' % (cmd,args))
-                            assert(cmd == 'load')
+                            assert(cmd == 'queue_add')
                             args = args[0]
-                            ans = list(self.load(args))
+                            ans = list(self.queue_add(args))
                             #TODO implement generic multi arg command and support for multi load (queue)
                             # ans = self.fire(cmd,args)
                         else:

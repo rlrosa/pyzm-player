@@ -16,7 +16,12 @@ cmd_id_name = {
     1: 'play',
     2: 'stop',
     3: 'status',
-    4: 'load',
+    4: 'queue_add',
+    5: 'quede_del',
+    6: 'quede_get',
+    7: 'queue_clear',
+    8: 'queue_next',
+    9: 'queue_prev',
     10:'help',
     11:'quit',
 }
