@@ -232,6 +232,7 @@ Usage example:
         self.register('status',self.status)
         self.register('queue_add',self.queue_add)
         self.register('queue_del',self.queue_del)
+        self.register('queue_get',self.queue_get)
         self.register('queue_clear',self.queue_clear)
         self.register('queue_next',self.queue_next)
         self.register('queue_prev',self.queue_prev)
@@ -318,7 +319,8 @@ Usage example:
                 gst.debug('Setting location to %s' % location)
                 try:
                     self.queue.append(location)
-                    gst.debug('Current queue:\n\t%s' % '\n\t'.join(self.queue))
+                    # call to print current queue
+                    self.queue_get()
                     if self.queue_pos == -1:
                         gst.debug('New queue, will next()')
                         ans_n = self.queue_next()
@@ -378,7 +380,21 @@ Usage example:
             ans = [400]
             ans.append(err_msg)
         if ans[0] == 200 and len(ans) > 1:
-            gst.debug('Updated queue:\n\t%s' % '\n\t'.join(self.queue))
+            # call to get debug output
+            self.queue_get()
+        return ans
+
+    def queue_get(self):
+        ans = [200]
+        try:
+            gst.debug('Current queue:\n\t%s' % '\n\t'.join(self.queue))
+            ans.append(self.queue)
+        except Exception as e:
+            err_msg = 'Problem in queue_get. Exception:%s' % e.__str__()
+            gst.debug(err_msg)
+            ans = [400]
+            ans.append(err_msg)
+        return ans
 
     def queue_clear(self):
         ans = [200]
