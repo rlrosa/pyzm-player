@@ -113,7 +113,7 @@ class GstPlayer():
         self.playing = False
 
     def play(self):
-        gst.info("playing player")
+        gst.info("playing player. src:%s" % self.get_current)
         self.player.set_state(gst.STATE_PLAYING)
         self.playing = True
 
@@ -127,6 +127,15 @@ class GstPlayer():
 
     def is_playing(self):
         return self.playing
+
+    def get_current(self):
+        ans = []
+        try:
+            ans = self.player.get_property('uri')
+        except Exception as e:
+            err_msg = 'Failed to get current. Exception:%s' % e.__str__()
+            gst.error(err_msg)
+        return ans
 
 class Listener(threading.Thread):
     """Listen on src (zmq or stdin) for incomming commands"""
@@ -493,7 +502,11 @@ Usage example:
         ans = [200]
         try:
             playing = self.is_playing()
-            ans.append(True) if playing else ans.append(False)
+            if playing:
+                current = self.player.get_current()
+                ans.append([playing,current])
+            else:
+                ans.append(False)
         except Exception as e:
             print e
             gst.error('Problem near status()')
