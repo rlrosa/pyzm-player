@@ -451,6 +451,11 @@ Usage example:
         if(step == 0):
             # come on...
             return ans,queue_moved
+        elif not self.queue:
+            # queue is empty
+            gst.debug('queue is empty')
+            ans = True
+            return ans,queue_moved
         try:
             queue_pos_old   = self.queue_pos
             queue_pos_new   = self.queue_pos + step
