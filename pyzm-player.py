@@ -543,11 +543,8 @@ Usage example:
         ans = [200]
         try:
             playing = self.is_playing()
-            if playing:
-                current = self.player.get_current()
-                ans.append([playing,current])
-            else:
-                ans.append(False)
+            current = self.player.get_current()
+            ans.append([playing,current])
         except Exception as e:
             print e
             gst.error('Problem near status()')
