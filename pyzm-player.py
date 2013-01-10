@@ -232,6 +232,7 @@ Usage example:
         self.register('status',self.status)
         self.register('queue_add',self.queue_add)
         self.register('queue_del',self.queue_del)
+        self.register('queue_clear',self.queue_clear)
         self.register('queue_next',self.queue_next)
         self.register('queue_prev',self.queue_prev)
         self.register('quit',self.quit)
@@ -378,6 +379,19 @@ Usage example:
             ans.append(err_msg)
         if ans[0] == 200 and len(ans) > 1:
             gst.debug('Updated queue:\n\t%s' % '\n\t'.join(self.queue))
+
+    def queue_clear(self):
+        ans = [200]
+        try:
+            self.queue_pos = -1
+            self.queue[:] = []
+            gst.debug('queue cleared')
+            self.queue_get()
+        except Exception as e:
+            err_msg = 'Problem near queue_clear. Exception:%s' % e.__str__()
+            gst.debug(err_msg)
+            ans = [400]
+            ans.append(err_msg)
         return ans
 
     def queue_next(self,step=1):
