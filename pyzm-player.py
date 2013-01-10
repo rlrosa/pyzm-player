@@ -370,9 +370,15 @@ Usage example:
                     self.queue_pos -= 1
                 elif ind == self.queue_pos:
                     # check if currently selected item was deleted
-                    self.queue_pos -= 1
+                    if not ind and self.queue:
+                        # special case, first element was removed and
+                        # more are left, set queue_pos to head
+                        self.queue_pos = 0
                     if self.queue_pos >= 0:
                         self.player.set_location(self.queue[self.queue_pos])
+                    else:
+                        # queue is empty now
+                        self.player.set_location(None)
         except Exception as e:
             print e
             err_msg = 'Problem near update queue_pos. Exception:%s' % e.__str__()
