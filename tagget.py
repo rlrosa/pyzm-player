@@ -6,7 +6,7 @@ import gst
 import gobject
 
 class tag_getter:
-    def __init__(self, tags):
+    def __init__(self, tags, timeout=2000):
         #make a dictionary to hold our tag info
         self.file_tags = tags
         #make a playbin to parse the audio file
@@ -19,6 +19,8 @@ class tag_getter:
         self.bus.connect("message::tag", self.bus_message_tag)
         self.bus.connect("message::err", self.bus_message_err)
         self.bus.connect("message::eos", self.bus_message_eos)
+        #create a timeout in case we fail to get tags
+        gobject.timeout_add(timeout,self.timeout)
         #create a loop to control our app
         self.mainloop = gobject.MainLoop()
 
@@ -63,23 +65,34 @@ class tag_getter:
         gst.debug('mainloop finished, will quit')
         return False
 
+    def timeout(self):
+        # time to give up
+        gst.warning('Timed out before getting tag')
+        self.quit()
+        return False
+
     def quit(self):
+        # avoid gst warnings
         self.pbin.set_state(gst.STATE_NULL)
         # done, lets go
         self.mainloop.quit()
 
-def get_tags(tags,uri):
-    tg = tag_getter(tags)
+def get_tags(tags,uri,timeout=2000):
+    tg = tag_getter(tags,timeout)
     tg.set_file(uri)
     tg.run()
 
 if __name__=="__main__":
     if len(sys.argv)>1:
         file = sys.argv[1]
+        try:
+            timeout = int(sys.argv[2])
+        except (IndexError,TypeError):
+            timeout = 2000
         tags = {}
         pwd = os.getcwd()
         filepath = os.path.join(pwd,file)
-        getter = tag_getter(tags)
+        getter = tag_getter(tags,timeout)
         getter.set_file(file)
         getter.run()
         print 'done:',tags
