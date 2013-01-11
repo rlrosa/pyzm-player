@@ -8,7 +8,8 @@ import gobject
 class tag_getter:
     def __init__(self, tags, timeout=2000):
         #make a dictionary to hold our tag info
-        self.file_tags = tags
+        self.file_tags = {}
+        self.tags      = tags
         #make a playbin to parse the audio file
         self.pbin = gst.element_factory_make("playbin")
         #we need to receive signals from the playbin's bus
@@ -24,6 +25,14 @@ class tag_getter:
         #create a loop to control our app
         self.mainloop = gobject.MainLoop()
 
+        # required tag fields
+        self.req_keys = ['artist',
+                         'title',
+                         'album',
+                         'genre',
+                         ]
+        gst.debug('Will attempt to fetch at least:%s' % self.req_keys.__str__())
+
     def bus_message_tag (self, bus, message):
         #we received a tag message
         gst.debug('msg rx: tag')
@@ -32,11 +41,14 @@ class tag_getter:
         for key in taglist.keys():
             self.file_tags[key] = taglist[key]
         #for this test, if we have the artist tag, we can quit
-        if self.file_tags['artist']:
-            gst.debug('got artist+title, will quit mainloop')
+        try:
+            for rk in self.req_keys:
+                self.tags[rk] = self.file_tags[rk]
+            gst.debug('got %s, will quit mainloop' % self.req_keys.__str__())
             self.file_tags['done'] = '1'
-            # avoid gst warnings
             self.quit()
+        except KeyError as e:
+            gst.debug('tag not complete, waiting for more tags...')
 
     def bus_message_err (self, bus, message):
         err, debug = message.parse_error()
