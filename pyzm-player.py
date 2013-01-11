@@ -317,6 +317,8 @@ Usage example:
             elif not is_dir:
                 gst.debug('Setting location to %s' % location)
                 try:
+                    if location in self.queue:
+                        gst.info('Duplicate entry %s' % location)
                     self.queue.append(location)
                     # call to print current queue
                     self.queue_get()
