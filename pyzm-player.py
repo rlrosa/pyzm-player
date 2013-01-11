@@ -509,8 +509,10 @@ Usage example:
             else:
                 gst.debug('Will play player')
                 self.player.play()
-        except:
+        except Exception as e:
+            err_msg = 'Problem near play. Exception:%s' % e.__str__()
             ans = [400]
+            ans.append(err_msg)
         return ans
 
     def stop(self):
