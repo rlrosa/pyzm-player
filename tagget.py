@@ -6,7 +6,7 @@ import gst
 import gobject
 
 class tag_getter:
-    def __init__(self, tags, timeout=2000):
+    def __init__(self, tags, uri=[], timeout=2000):
         #make a dictionary to hold our tag info
         self.file_tags = {}
         self.tags      = tags
@@ -21,6 +21,9 @@ class tag_getter:
         self.bus.connect("message::tag", self.bus_message_tag)
         self.bus.connect("message::err", self.bus_message_err)
         self.bus.connect("message::eos", self.bus_message_eos)
+        if uri:
+            # must be called after playbin is ready
+            self.set_file(uri)
         #create a loop to control our app
         self.mainloop = gobject.MainLoop()
 
@@ -132,8 +135,7 @@ def get_tags(tags,uri,timeout=2000):
       tgt.start()
       print tags
     """
-    tg = tag_getter(tags,timeout)
-    tg.set_file(uri)
+    tg = tag_getter(tags,file=uri,timeout=timeout)
     tg.run()
 
 if __name__=="__main__":
