@@ -59,10 +59,6 @@ class tag_getter:
         gst.error('Got eos, will abort')
         self.quit()
 
-    def bus_message_eos(self, bus, message):
-        gst.debug('msg rx: eos')
-        sys.exit(0)
-
     def set_file(self,uri):
         #set the uri of the playbin to our audio file
         self.pbin.set_property('uri',uri)
