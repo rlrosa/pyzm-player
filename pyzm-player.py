@@ -22,6 +22,8 @@ from time import sleep
 from urllib2 import urlopen
 import threading
 
+import tagget
+
 import zmq
 
 # defs, etc
@@ -319,7 +321,18 @@ Usage example:
                 try:
                     if location in self.queue:
                         gst.info('Duplicate entry %s' % location)
-                    self.queue.append(location)
+                    self.queue.append({'uri':location,'tags':{}})
+                    try:
+                        gst.debug('will prepare tag getter')
+                        tgt = threading.Thread(target=tagget.get_tags,
+                                               args=[self.queue[-1]['tags'],
+                                                     location])
+                        gst.debug('will start tag getter')
+                        tgt.start()
+
+                    except Exception as e:
+                        err_msg = 'Problem near tag get thread. Exception:%s' % e.__str__()
+                        gst.warning(err_msg)
                     # call to print current queue
                     self.queue_get()
                     if self.queue_pos == -1:
@@ -336,6 +349,14 @@ Usage example:
                     gst.error('Problem near queue.append()')
         return ans
 
+    def queue_item_by_uri(self,uri):
+        try:
+            elem = (item for item in self.queue if item['uri'] == uri).next()
+        except StopIteration as e:
+            err_msg = 'Exception:%s' % e.__str__()
+            return False
+        return elem
+
     def queue_del(self,uri=None,pos=-1):
         """Remove an item from the queue. Item can be selected
         either by URI or by pos (position) in the queue.
@@ -346,10 +367,11 @@ Usage example:
         ind = -1
         if uri:
             try:
-                ind = self.queue.index(uri)
+                elem = self.queue_item_by_uri(uri)
+                self.queue.index(elem)
                 self.queue.remove(uri)
                 ans.append('Removed element %s' % uri)
-            except ValueError as e:
+            except (ValueError, StopIteration) as e:
                 err_msg = 'Exception:%s' % e.__str__()
                 gst.warning(err_msg)
                 ans = [400]
@@ -376,7 +398,9 @@ Usage example:
                         # more are left, set queue_pos to head
                         self.queue_pos = 0
                     if self.queue_pos >= 0:
-                        self.player.set_location(self.queue[self.queue_pos])
+                        uri_new = self.queue[self.queue_pos]['uri']
+                        get.debug('setting uri to %s' % uri_new)
+                        self.player.set_location(uri_new)
                     else:
                         # queue is empty now
                         self.player.set_location(None)
@@ -394,8 +418,11 @@ Usage example:
     def queue_get(self):
         ans = [200]
         try:
-            gst.debug('Current queue:\n\t%s' % '\n\t'.join(self.queue))
-            ans.append(self.queue)
+            uris = []
+            for elem in self.queue:
+                uris.append(elem['uri'])
+            gst.debug('Current queue:\n\t%s' % '\n\t'.join(uris))
+            ans.append(uris)
         except Exception as e:
             err_msg = 'Problem in queue_get. Exception:%s' % e.__str__()
             gst.debug(err_msg)
@@ -477,8 +504,9 @@ Usage example:
                 queue_finished = True
             queue_moved = abs(queue_pos_new - queue_pos_old)
 
-            gst.debug('Will set new location')
-            self.player.set_location(self.queue[queue_pos_new])
+            uri_new = self.queue[queue_pos_new]['uri']
+            gst.debug('Will set new location to %s' % uri_new)
+            self.player.set_location(uri_new)
             # update queue position
             self.queue_pos = queue_pos_new
             gst.debug('New queue_pos:%d/%d' % (self.queue_pos, len(self.queue)))
@@ -543,9 +571,15 @@ Usage example:
         #TODO return metadata if playing
         ans = [200]
         try:
+            gst.debug(self.queue.__str__())
             playing = self.is_playing()
             current = self.player.get_current()
-            ans.append([playing,current])
+            tags    = self.queue_item_by_uri(current)
+            if not tags:
+                # Failed to find tags or search is still
+                # in progress
+                tags = {}
+            ans.append([playing,current,tags])
         except Exception as e:
             print e
             gst.error('Problem near status()')
