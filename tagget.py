@@ -6,6 +6,22 @@ import gst
 import gobject
 
 class TagGetter:
+    """
+    Class to fetch metadata info from file.
+    Constructor Arguments:
+      - tags   : Metadata extracted from file is returned here.
+      - uri    : Target file.
+      - timeout: Max time to wait for req_keys metadata fields.
+                 If timed out, will return the fields found.
+    To run in backgrond thread see the function get_tags()
+
+    Example usage:
+      import tagget
+      tags = {}
+      tg = tagget.TagGetter(tags,'file:///tmp/file.mp3')
+      tg.run()
+      print tags
+    """
     def __init__(self, tags, uri=[], timeout=2000):
         #make a dictionary to hold our tag info
         self.file_tags = {}
