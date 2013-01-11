@@ -4,7 +4,6 @@ import os
 import sys
 import gst
 import gobject
-gobject.threads_init()
 
 class tag_getter:
     def __init__(self, tags):
