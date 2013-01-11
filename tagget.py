@@ -10,6 +10,7 @@ class tag_getter:
         #make a dictionary to hold our tag info
         self.file_tags = {}
         self.tags      = tags
+        self.timeout   = timeout
         #make a playbin to parse the audio file
         self.pbin = gst.element_factory_make("playbin")
         #we need to receive signals from the playbin's bus
@@ -20,8 +21,6 @@ class tag_getter:
         self.bus.connect("message::tag", self.bus_message_tag)
         self.bus.connect("message::err", self.bus_message_err)
         self.bus.connect("message::eos", self.bus_message_eos)
-        #create a timeout in case we fail to get tags
-        gobject.timeout_add(timeout,self.timeout)
         #create a loop to control our app
         self.mainloop = gobject.MainLoop()
 
@@ -71,14 +70,24 @@ class tag_getter:
         self.pbin.set_state(gst.STATE_PAUSED)
         
     def run(self):
+        """
+        Starts the mainloop and wait for tag messages.
+        Returns false on mainloop termination.
+        """
+        #create a timeout in case we fail to get tags
+        gst.debug('Will configure a %d ms timeout' % self.timeout)
+        gobject.timeout_add(self.timeout,self.timeout_cb)
         #start the main loop
         gst.debug('Will enter mainloop to wait for tag messages')
         self.mainloop.run()
         gst.debug('mainloop finished, will quit')
         return False
 
-    def timeout(self):
-        # time to give up
+    def timeout_cb(self):
+        """
+        Callback for timeout, used in case tag messages do not include
+        all the information required by self.req_keys.
+        """
         gst.warning('Timed out before getting tag')
         self.quit()
         return False
