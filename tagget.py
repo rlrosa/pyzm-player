@@ -50,16 +50,34 @@ class tag_getter:
             gst.debug('tag not complete, waiting for more tags...')
 
     def bus_message_err (self, bus, message):
+        """
+        Callback for gst.MESSAGE_ERROR, will
+        give up on tag search
+        """
         err, debug = message.parse_error()
         err_msg = 'Got error message, will abort:%s ' % err, debug
         gst.error(err_msg)
         self.quit()
 
     def bus_message_eos (self, bus, message):
+        """
+        Callback for gst.MESSAGE_EOS, will
+        give up on tag search
+        """
         gst.error('Got eos, will abort')
         self.quit()
 
     def set_file(self,uri):
+        """
+        Set uri to file who's metadata should be analyzed.
+        WARN: Does not validate uri.
+        Example:
+          tags = {}
+          tg = tag_getter(tags)
+          tg.set_file('http://www.mysite.com/file.mp3')
+          tg.run()
+          print tags
+        """
         #set the uri of the playbin to our audio file
         self.pbin.set_property('uri',uri)
         #pause the playbin, we don't really need to play
@@ -89,12 +107,31 @@ class tag_getter:
         return False
 
     def quit(self):
+        """
+        Stops mainloop, triggering the end of self.run()
+        """
         # avoid gst warnings
         self.pbin.set_state(gst.STATE_NULL)
         # done, lets go
         self.mainloop.quit()
 
 def get_tags(tags,uri,timeout=2000):
+    """
+    Creates an instance of tag_getter() and runs until
+    either all tag req_keys have been obtained or the timeout
+    callback terminated the mainloop.
+    Arguments:
+      tags   : Reference to dict where metadata will be returned
+      uri    : Where to find the file.
+      timeout: Max time to spend searching for metadata (ms)
+
+    Example usage:
+      tags = {}
+      tgt = threading.Thread(target=tagget.get_tags,
+                             args=[tags,'file:///tmp/file.mp3'])
+      tgt.start()
+      print tags
+    """
     tg = tag_getter(tags,timeout)
     tg.set_file(uri)
     tg.run()
