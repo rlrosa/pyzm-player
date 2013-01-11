@@ -2,25 +2,43 @@
 # -*- Mode: Python -*-
 # vi:si:et:sw=4:sts=4:ts=4
 
-import sys
-import os
-
+# for mainloop in listeners
 import gobject
 gobject.threads_init()
 
+# python gstreamer bindings
 import gst
 
+# callbacks are organized in dict
 import collections
+
+# input parsing
 import getopt
+
+# __main__ keep alive is based on polling to
+# check is listener threads are alive, sleep
+# between polls
 from time import sleep
+# to exit __main__
+import sys
+
+# enables verification of url
 from urllib2 import urlopen
+# enables verification of local files
+import os
+
+# used for:
+#   - gst,zmq listeners,
+#   - bg metadata lookup
 import threading
 
+# metadata reading
 import tagget
 
+# server-client communication
 import zmq
 
-# defs, etc
+# server-client msg builder, defs, etc
 import shared
 
 class GstListener(threading.Thread):
