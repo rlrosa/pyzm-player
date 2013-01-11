@@ -5,7 +5,7 @@ import sys
 import gst
 import gobject
 
-class tag_getter:
+class TagGetter:
     def __init__(self, tags, uri=[], timeout=2000):
         #make a dictionary to hold our tag info
         self.file_tags = {}
@@ -76,7 +76,7 @@ class tag_getter:
         WARN: Does not validate uri.
         Example:
           tags = {}
-          tg = tag_getter(tags)
+          tg = TagGetter(tags)
           tg.set_file('http://www.mysite.com/file.mp3')
           tg.run()
           print tags
@@ -120,7 +120,7 @@ class tag_getter:
 
 def get_tags(tags,uri,timeout=2000):
     """
-    Creates an instance of tag_getter() and runs until
+    Creates an instance of TagGetter() and runs until
     either all tag req_keys have been obtained or the timeout
     callback terminated the mainloop.
     Arguments:
@@ -135,7 +135,7 @@ def get_tags(tags,uri,timeout=2000):
       tgt.start()
       print tags
     """
-    tg = tag_getter(tags,file=uri,timeout=timeout)
+    tg = TagGetter(tags,file=uri,timeout=timeout)
     tg.run()
 
 if __name__=="__main__":
@@ -148,7 +148,7 @@ if __name__=="__main__":
         tags = {}
         pwd = os.getcwd()
         filepath = os.path.join(pwd,file)
-        getter = tag_getter(tags,timeout)
+        getter = TagGetter(tags,timeout)
         getter.set_file(file)
         getter.run()
         print 'done:',tags
