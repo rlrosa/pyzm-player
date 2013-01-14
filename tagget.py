@@ -151,7 +151,7 @@ def get_tags(tags,uri,timeout=2000):
       tgt.start()
       print tags
     """
-    tg = TagGetter(tags,file=uri,timeout=timeout)
+    tg = TagGetter(tags,uri=uri,timeout=timeout)
     tg.run()
 
 if __name__=="__main__":
