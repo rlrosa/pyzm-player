@@ -15,7 +15,7 @@ Running the server:
         -p portNumber   //      --port=portNumber
         -l [zmq,stdin]  //      --listen=[zmq,stdin]
         -i              //      --info
-	-v              //      --verify
+        -v              //      --verify
     
     rrosa@rrosa-X220:~/work/pyzm-player$./pyzm-player.py
     Server running, listening on zmq port 5555...
@@ -25,7 +25,7 @@ Running the client:
     rrosa@rrosa-X220:~/work/pyzm-player$ ./zmq-client.py -i
     Valid arguments:
         -p portNumber   //      --port=portNumber
-	-s serverIP     //      --server=xxx.xxx.xxx.xxx
+        -s serverIP     //      --server=xxx.xxx.xxx.xxx
         -i              //      --info
     rrosa@rrosa-X220:~/work/pyzm-player$ ./zmq-client.py 
     Will send stdin via zmq.
@@ -89,21 +89,21 @@ Currently the field 'data' is assumed to be a list of strings, may contain error
 
 Example message received from server in response to 'status' command:
 
-  "ack": {
-    "cmd_code": 3, 
-    "res_code": 200
-  }, 
-  "data": [
-    false, 
-    "file:///tmp/orishas.mp3", 
-    {
-      "uri": "file:///tmp/orishas.mp3", 
-      "tags": {
-        "album": "Lo Mejor De Orishas", 
-        "genre": "Hip-Hop", 
-        "artist": "Orishas", 
-        "title": "Emigrantes"
+    "ack": {
+      "cmd_code": 3, 
+      "res_code": 200
+    }, 
+    "data": [
+      false, 
+      "file:///tmp/orishas.mp3", 
+      {
+        "uri": "file:///tmp/orishas.mp3", 
+        "tags": {
+          "album": "Lo Mejor De Orishas", 
+          "genre": "Hip-Hop", 
+          "artist": "Orishas", 
+          "title": "Emigrantes"
+        }
       }
-    }
-  ]
+    ]
 
