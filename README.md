@@ -15,7 +15,7 @@ Running the server:
         -p portNumber   //      --port=portNumber
         -l [zmq,stdin]  //      --listen=[zmq,stdin]
         -i              //      --info
-	-v              //      --verify
+        -v              //      --verify
     
     rrosa@rrosa-X220:~/work/pyzm-player$./pyzm-player.py
     Server running, listening on zmq port 5555...
@@ -25,7 +25,7 @@ Running the client:
     rrosa@rrosa-X220:~/work/pyzm-player$ ./zmq-client.py -i
     Valid arguments:
         -p portNumber   //      --port=portNumber
-	-s serverIP     //      --server=xxx.xxx.xxx.xxx
+        -s serverIP     //      --server=xxx.xxx.xxx.xxx
         -i              //      --info
     rrosa@rrosa-X220:~/work/pyzm-player$ ./zmq-client.py 
     Will send stdin via zmq.
@@ -89,21 +89,51 @@ Currently the field 'data' is assumed to be a list of strings, may contain error
 
 Example message received from server in response to 'status' command:
 
-  "ack": {
-    "cmd_code": 3, 
-    "res_code": 200
-  }, 
-  "data": [
-    false, 
-    "file:///tmp/orishas.mp3", 
-    {
-      "uri": "file:///tmp/orishas.mp3", 
-      "tags": {
-        "album": "Lo Mejor De Orishas", 
-        "genre": "Hip-Hop", 
-        "artist": "Orishas", 
-        "title": "Emigrantes"
+    "ack": {
+      "cmd_code": 3, 
+      "res_code": 200
+    }, 
+    "data": [
+      false, 
+      "file:///tmp/orishas.mp3", 
+      {
+        "uri": "file:///tmp/orishas.mp3", 
+        "tags": {
+          "album": "Lo Mejor De Orishas", 
+          "genre": "Hip-Hop", 
+          "artist": "Orishas", 
+          "title": "Emigrantes"
+        }
       }
-    }
-  ]
+    ]
+
+
+Server Interface
+----------------
+
+To send messages to the server, use the ```json_client_enc()``` from [shared.py](https://github.com/rlrosa/pyzm-player/blob/master/shared.py).
+Accepted commands can be retrieved by sending the ```help``` command:
+
+    -- Help menu --
+
+    Valid commands:
+            status
+            queue_next
+            play
+            queue_clear
+            help
+            quit
+            stop
+            queue_get
+            queue_prev
+            queue_add
+            queue_del
+
+The only commands that take arguments are <code>queue_add</code> and <code>queue_del</code>.
+
+* ```queue_add```: Takes the uri of a file to add, or the uri of a local directory. In the latter, every ```.mp3``` file in the given dir will be added to the play queue.
+* ```queue_del```: Removes an element from the play queue. Element can be selected either by passing its uri as an arg or by passing the position in the play queue (play queue can be retrieved with ```queue_get```)
+
+
+
 
