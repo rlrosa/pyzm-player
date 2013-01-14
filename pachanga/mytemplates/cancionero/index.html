@@ -24,18 +24,30 @@
 {% else %}
     <p>List empty.</p>
 {% endif %}
-<input type=button onclick="addToPlayList()" value="Add To PlayList">
+<!--<input type=button onclick="addToPlayList()" value="Add To PlayList">
 
       <select name="playList" MULTIPLE size="10">
-      </select>
-      
-<input type=button onclick="play()" value="Play">
-<input type=button onclick="stop()" value="Stop">
-<input type=button onclick="next()" value="Next">
+      </select>-->
+<form action="{% url 'cancionero:play' %}" method="post" >
+{% csrf_token %}
+<input type="submit" value="Play" />
+</form>
+
+<form action="{% url 'cancionero:stop' %}" method="post" >
+{% csrf_token %}
+<input type="submit" value="Stop" />
+</form>
+
+<!--<input type=button onclick="next()" value="Next">
 <input type=button onclick="forward()" value="Forward">
-<input type=button onclick="delete()" value="Delete">
+<input type=button onclick="delete()" value="Delete">-->
 
-
+<form action="{% url 'cancionero:addToPlayList' %}" method="post" >
+{% csrf_token %}
+URL:
+<input name="url" >
+<input type="submit" value="Add to PlayList" />
+</form>
 
 
 
