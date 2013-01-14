@@ -335,7 +335,7 @@ Usage example:
                         gst.info('Duplicate entry %s' % location)
                     self.queue.append({'uri':location,'tags':{}})
                     try:
-                        gst.debug('will prepare tag getter')
+                        gst.debug('will prepare tag getter: get_tags(%s)' % location)
                         tgt = threading.Thread(target=tagget.get_tags,
                                                args=[self.queue[-1]['tags'],
                                                      location])
