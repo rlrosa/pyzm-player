@@ -1,0 +1,120 @@
+{% load url from future %}
+
+<p align=center>
+<i>
+<font size=5>
+<b >Pa  chan  gá EE, pa  chan  gá AA</b> 
+</font>
+</i> 
+</p>
+
+
+{% if song_list %}
+      <ul>
+      <p>
+      <select name="songsList" MULTIPLE size="10">
+      {% for song in song_list %}
+  <!--        <li>{{ song.songName }}</li>-->
+	  <option>{{ song.songName }}-{{ song.songAuthor }}</option>
+      {% endfor %}
+
+      </select>
+      </p>
+      </ul>
+{% else %}
+    <p>List empty.</p>
+{% endif %}
+<!--<input type=button onclick="addToPlayList()" value="Add To PlayList">
+
+      <select name="playList" MULTIPLE size="10">
+      </select>-->
+<form action="{% url 'cancionero:play' %}" method="post" >
+{% csrf_token %}
+<input type="submit" value="Play" />
+</form>
+
+<form action="{% url 'cancionero:stop' %}" method="post" >
+{% csrf_token %}
+<input type="submit" value="Stop" />
+</form>
+
+<!--<input type=button onclick="next()" value="Next">
+<input type=button onclick="forward()" value="Forward">
+<input type=button onclick="delete()" value="Delete">-->
+
+<form action="{% url 'cancionero:addToPlayList' %}" method="post" >
+{% csrf_token %}
+URL:
+<input name="url" >
+<input type="submit" value="Add to PlayList" />
+</form>
+
+
+
+
+
+<p ALIGN=LEFT> 
+<br>
+<br>
+<i>
+<font size=5>
+<b>Desea agregar más canciones?</b> 
+</font>
+</i> 
+</p>
+
+
+<form action="{% url 'cancionero:addSong' %}" method="post" >
+{% csrf_token %}
+<TABLE>
+<TR><TD>Nombre del tema:</TD>
+<TD><input name="name" ></TD>
+</TR>
+<TR><TD>URL del tema:</TD>
+<TD><input name="url" ></TD>
+</TR>
+<TR><TD>Autor(opcional):</TD>
+<TD><input name="author" > </TD>
+</TR>
+<TR><TD>Estilo(opcional):</TD>
+<TD><input name="style" ></TD>
+</TR>
+</TABLE>
+<input type="submit" value="Agregar" />
+</form>
+
+
+
+<script language="JavaScript">
+function sendNewSong(){
+    alert('La cancion fue agregada correctamente.');
+}
+
+function addToPlayList(){
+   var id = document.songsList.selectedIndex;
+   var url = document.formNewSong.url.value;
+   var n = document.formNewSong.author.value;
+   var nombre = document.formNewSong.style.value;
+
+   
+   
+   return true;
+
+}
+
+function play(){
+  
+}
+
+function stop(){
+}
+
+function next(){
+}
+
+function forward(){
+}
+
+function delete(){
+}
+</script> 
