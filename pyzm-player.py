@@ -2,32 +2,53 @@
 # -*- Mode: Python -*-
 # vi:si:et:sw=4:sts=4:ts=4
 
-import pygtk
-pygtk.require('2.0')
-
-import sys
-
+# for mainloop in listeners
 import gobject
 gobject.threads_init()
 
-import pygst
-pygst.require('0.10')
+# python gstreamer bindings
 import gst
-import gst.interfaces
 
+# callbacks are organized in dict
 import collections
+
+# input parsing
 import getopt
+
+# __main__ keep alive is based on polling to
+# check is listener threads are alive, sleep
+# between polls
 from time import sleep
+# to exit __main__
+import sys
+
+# enables verification of url
 from urllib2 import urlopen
-import json
+# enables verification of local files
+import os
+
+# used for:
+#   - gst,zmq listeners,
+#   - bg metadata lookup
 import threading
 
+# metadata reading
+import tagget
+
+# server-client communication
 import zmq
 
-# defs, etc
-from shared import r_codes,cmd_id_name,cmd_name_id
+# server-client msg builder, defs, etc
+import shared
 
 class GstListener(threading.Thread):
+    """
+    Thread to listen on gst bus and catch events
+    relevant to the player.
+    Takes a callback function as Class argument on _init__,
+    this callback will be executed when any message arrives
+    on the gst bus. Messages are not processes by this class.
+    """
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, verbose=None):
         threading.Thread.__init__(self, group=group, target=target,
@@ -49,11 +70,22 @@ class GstListener(threading.Thread):
         self.loop.run()
 
 class GstPlayer():
-    def __init__(self):
+    """
+    Gst player class
+
+    Must not be used on its own, runs within an instance
+    of PlayerControl(), which takes care of running the
+    listening threads requiered to respond to input/events.
+
+    Constructor takes a callback function as an argument. This function
+    will be called on gst.MESSAGE_EOS.
+
+    """
+    def __init__(self, cb_eos=None):
         self.playing = False
         self.player  = gst.element_factory_make("playbin", "player")
         self.bus     = self.player.get_bus()
-#        self.on_eos = False
+        self.cb_eos = cb_eos if not None else self.stop()
 
     def on_message(self, bus, message):
         t = message.type
@@ -63,12 +95,16 @@ class GstPlayer():
             self.stop()
         elif t == gst.MESSAGE_EOS:
             gst.info("File playback completed")
-            self.stop()
+            ok,moved = self.cb_eos()
+            if ok:
+                gst.debug('eos callback completed, moved queue %d places' % moved)
+            else:
+                gst.warning('eos callback failed!')
             # if(self.queued):
             #     self.play()
 
     def set_location(self, location):
-        print "Loading %s", location
+        print "Loading %s" % location
         self.player.set_property('uri', location)
 
     def query_position(self):
@@ -108,7 +144,7 @@ class GstPlayer():
         self.playing = False
 
     def play(self):
-        gst.info("playing player")
+        gst.info("playing player. src:%s" % self.get_current)
         self.player.set_state(gst.STATE_PLAYING)
         self.playing = True
 
@@ -123,8 +159,24 @@ class GstPlayer():
     def is_playing(self):
         return self.playing
 
+    def get_current(self):
+        ans = []
+        try:
+            ans = self.player.get_property('uri')
+        except Exception as e:
+            err_msg = 'Failed to get current. Exception:%s' % e.__str__()
+            gst.error(err_msg)
+        return ans
+
 class Listener(threading.Thread):
-    """Listen on src (zmq or stdin) for incomming commands"""
+    """
+    Listen for commands on src (zmq or stdin).
+
+    Class constructor takes 3 arguments:
+      - cb  : Callback function that responds to input.
+      - src : Indicates if input will come from 'zmq' or 'stdin'
+      - port: Determines which port the 'zmq' server should bind to.
+      """
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, verbose=None):
         threading.Thread.__init__(self, group=group, target=target,
@@ -181,9 +233,20 @@ class Listener(threading.Thread):
 
 class PlayerControl():
     """
-PlayerControl plays mp3 files.
-Receives commands over zmq or stdin.
-Usage example:
+    PlayerControl plays mp3 files.
+    Receives commands over zmq or stdin.
+
+    Constructor takes the following arguments:
+      - src           : Indicates if server should listen on
+      either 'stdin' or 'zmq'.
+      - port          : Port to which the 'zmq' server should
+      bind to.
+      - verify_on_load: If True, then before adding a file to the
+      queue the server will check if the file exists.
+      NOTE: In order to be able to add directories to the play
+            queue, the server must be run with verify_on_load=True
+
+    Usage example:
       pl = PlayerControl('zmq',5556)
       pl.start()
       # now run a client and send commands, loop
@@ -192,7 +255,8 @@ Usage example:
         sleep(0.5)
     """
     handlers = None
-    # queued = False
+    queue    = None
+    queue_pos= None
 
     # zmq variables
     port    = None
@@ -204,16 +268,23 @@ Usage example:
         self.port           = port
         self.src            = src
         self.verify_on_load = verify_on_load
-        self.player         = GstPlayer()
+        self.player         = GstPlayer(self.queue_next)
         self.gst_listener   = GstListener(args=(self.player.bus, self.player.on_message),kwargs=[])
         self.listener       = Listener(args=(self.handle_cmd, self.src, self.port),kwargs=[])
+        self.queue          = list()
+        self.queue_pos      = -1
 
         # init callbacks
         self.handlers = collections.defaultdict(set)
         self.register('play',self.play)
         self.register('stop',self.stop)
-        self.register('is_playing',self.is_playing)
-        self.register('load',self.load)
+        self.register('status',self.status)
+        self.register('queue_add',self.queue_add)
+        self.register('queue_del',self.queue_del)
+        self.register('queue_get',self.queue_get)
+        self.register('queue_clear',self.queue_clear)
+        self.register('queue_next',self.queue_next)
+        self.register('queue_prev',self.queue_prev)
         self.register('quit',self.quit)
         self.register('help',self.help)
 
@@ -231,14 +302,38 @@ Usage example:
         for handler in self.handlers.get(event, []):
             return handler(**kwargs)
 
-    def load(self, location):
+    def queue_add(self, location):
+        """
+        Adds location to the play queue.
+
+        NOTES:
+          - location must be a valid URI
+          - If self.verify_on_load==True, then location
+          can be a directory. All .mp3 files from the
+          directory will be loaded.
+
+        Return values:
+          - If successful: [200]
+          - else: [err_code,[err_msg]].
+        """
         ans = [200]
-        if not gst.uri_is_valid(location):
-            gst.error("Error: Invalid URI: %s\nExpected uri"
+        is_dir = False
+        is_ascii = True
+        # ignore non-ascii stuff
+        try:
+            unicode(location)
+        except UnicodeDecodeError as e:
+            is_ascii = False
+            gst.warning('Ignoring %s, not ascii' % location)
+            ans = [406]
+            ans.append(e.__str__())
+        if not is_ascii or not gst.uri_is_valid(location):
+            if is_ascii:
+                gst.error("Error: Invalid URI: %s\nExpected uri"
                       "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
-            ans = [403]
+                ans = [403]
         else:
-            # if(self.player.is_playing()):
+            # if(self.player.status()):
             #     self.queued = True
             gst.debug('URI is valid: %s' % location)
             err_msg = []
@@ -247,13 +342,35 @@ Usage example:
             if self.verify_on_load:
                 gst.debug('Attempting to verify %s' % location)
                 if location[0:4] == 'file':
+                    path = location[7:]
                     try:
-                        with open(location[8:]) as f: pass
+                        with open(path) as f: pass
                     except IOError as e:
-                        gst.error('Failed to open %s' % location[8:])
-                        ans = [404]
-                        err_msg = 'Failed to find %s\nWill not load. Error: %d - %s' % (location,code,msg)
-                        ans.append(err_msg)
+                        if e.errno == 21:
+                            is_dir = True
+                            loaded = []
+                            try:
+                                # is directory, load content
+                                os.chdir(path)
+                                for f in os.listdir('.'):
+                                    if f.endswith('.mp3'):
+                                        full_path = location+'/'+f
+                                        res = self.queue_add(full_path)
+                                        if res[0] == 200:
+                                            loaded.append(full_path)
+                                ans.append(loaded)
+                            except IOError as e:
+                                err_msg = 'Error parsing directory, will'\
+                                    'stop loading, exception:%s' % e.__str__()
+                                gst.error(err_msg)
+                                ans = [404]
+                                ans.append(err_msg)
+                        else:
+                            err_msg = 'Will not load, exception when opening'\
+                                '%s: %s' % (path,e.__str__())
+                            gst.error(err_msg)
+                            ans = [404]
+                            ans.append(err_msg)
                 elif location[0:4] == 'http':
                     try:
                         urlopen_ans  = urlopen(location)
@@ -270,48 +387,333 @@ Usage example:
                     gst.debug('Verification succeeded!')
             if err_msg:
                 gst.warning(err_msg)
-            else:
+            elif not is_dir:
                 gst.debug('Setting location to %s' % location)
                 try:
-                    self.player.set_location(location)
-                except:
+                    if location in self.queue:
+                        gst.info('Duplicate entry %s' % location)
+                    self.queue.append({'uri':location,'tags':{}})
+                    try:
+                        gst.debug('will prepare tag getter: get_tags(%s)' % location)
+                        tgt = threading.Thread(target=tagget.get_tags,
+                                               args=[self.queue[-1]['tags'],
+                                                     location])
+                        gst.debug('will start tag getter')
+                        tgt.start()
+
+                    except Exception as e:
+                        err_msg = 'Problem near tag get thread. Exception:%s' % e.__str__()
+                        gst.warning(err_msg)
+                    # call to print current queue
+                    self.queue_get()
+                    if self.queue_pos == -1:
+                        gst.debug('New queue, will next()')
+                        ans_n = self.queue_next()
+                        if ans_n[0] == 200:
+                            gst.debug('New queue play success!')
+                        else:
+                            ans = [400]
+                            ans.append('Failed to set initial queue position')
+                except Exception as e:
+                    print e
                     ans = [400]
+                    gst.error('Problem near queue.append()')
         return ans
 
-    def play(self):
+    def queue_item_by_uri(self,uri):
+        try:
+            elem = (item for item in self.queue if item['uri'] == uri).next()
+        except StopIteration as e:
+            err_msg = 'Exception:%s' % e.__str__()
+            return False
+        return elem
+
+    def queue_del(self,uri=None,pos=-1):
+        """Remove an item from the queue. Item can be selected
+        either by URI or by pos (position) in the queue.
+
+        Removing the currently playing element will not stop playback.
+        """
+        ans = [200]
+        ind = -1
+        if uri:
+            try:
+                elem = self.queue_item_by_uri(uri)
+                self.queue.index(elem)
+                self.queue.remove(uri)
+                ans.append('Removed element %s' % uri)
+            except (ValueError, StopIteration) as e:
+                err_msg = 'Exception:%s' % e.__str__()
+                gst.warning(err_msg)
+                ans = [400]
+                ans.append(err_msg)
+        elif pos >= 0:
+            try:
+                ind = pos
+                del self.queue[pos]
+                ans.append('Removed element at queue[%d]' % pos)
+            except IndexError as e:
+                err_msg = 'Failed to remove at %d. Exception:%s' % (pos,e.__str__())
+                gst.warning(err_msg)
+                ans = [400]
+                ans.append(err_msg)
+        try:
+            if ans[0] == 200:
+                if ind < self.queue_pos:
+                    # update queue_pos to new queue size
+                    self.queue_pos -= 1
+                elif ind == self.queue_pos:
+                    # check if currently selected item was deleted
+                    if not ind and self.queue:
+                        # special case, first element was removed and
+                        # more are left, set queue_pos to head
+                        self.queue_pos = 0
+                    if self.queue_pos >= 0:
+                        uri_new = self.queue[self.queue_pos]['uri']
+                        get.debug('setting uri to %s' % uri_new)
+                        self.player.set_location(uri_new)
+                    else:
+                        # queue is empty now
+                        self.player.set_location(None)
+        except Exception as e:
+            print e
+            err_msg = 'Problem near update queue_pos. Exception:%s' % e.__str__()
+            gst.error(err_msg)
+            ans = [400]
+            ans.append(err_msg)
+        if ans[0] == 200 and len(ans) > 1:
+            # call to get debug output
+            self.queue_get()
+        return ans
+
+    def queue_get(self):
+        """
+        Gets the current queue.
+
+        Return values:
+          - If successful: [200,[uri1,uri2,etc]]
+          - else: [err_code,[err_message]]
+        """
         ans = [200]
         try:
-            if self.player.is_playing():
+            uris = []
+            for elem in self.queue:
+                uris.append(elem['uri'])
+            gst.debug('Current queue:\n\t%s' % '\n\t'.join(uris))
+            ans.append(uris)
+        except Exception as e:
+            err_msg = 'Problem in queue_get. Exception:%s' % e.__str__()
+            gst.debug(err_msg)
+            ans = [400]
+            ans.append(err_msg)
+        return ans
+
+    def queue_clear(self):
+        """
+        Clears the current queue.
+
+        Return values:
+          - If successful: [200]
+          - else: [err_code,[err_message]]
+        """
+        ans = [200]
+        try:
+            self.queue_pos = -1
+            self.queue[:] = []
+            gst.debug('queue cleared')
+            self.queue_get()
+        except Exception as e:
+            err_msg = 'Problem near queue_clear. Exception:%s' % e.__str__()
+            gst.debug(err_msg)
+            ans = [400]
+            ans.append(err_msg)
+        return ans
+
+    def queue_next(self,step=1):
+        """
+        Advances 1 position in queue.
+        case player state:
+          - playing: the new track will start playing
+          - paused : the current track will be preserved. new track will be played
+          only if user inputs 'next' or ['stop','play'].
+          - stopped: the new track will not be played until client sends 'play'
+
+        Return values:
+          - If successful [200,positions_moved]
+          - else: [error_code]
+        """
+        ans = [400]
+        try:
+            gst.debug('Will next_prev(%d)' % step)
+            ok,moved = self.next_prev(step)
+            gst.debug('next_prev(%d) returned (%f,%d)' % (step,ok,moved))
+            if ok:
+                ans = [200]
+                ans.append(moved)
+        except Exception as e:
+            print e
+            gst.error('Problem near queue_next()')
+        return ans
+
+    def queue_prev(self,step=-1):
+        """
+        Just like 'queue_next()' but backwards'
+        """
+        ans = [400]
+        if step >= 0:
+            return ans
+        try:
+            ok,moved = self.next_prev(step)
+            if ok:
+                ans = [200]
+                ans.append(moved)
+        except Exception as e:
+            print e
+            gst.error('Problem near queue_prev()')
+        return ans
+
+    def next_prev(self, step):
+        """
+        Move queue step positions (next,back)
+        Returns a tuple (ok,queue_moved), where
+        the value queue_moved indicates number of postions
+        shifted by queue_move(), and is valid only if ok==True
+        """
+        ans         = False
+        queue_moved = 0
+        if(step == 0):
+            # come on...
+            return ans,queue_moved
+        elif not self.queue:
+            # queue is empty
+            gst.debug('queue is empty')
+            ans = True
+            return ans,queue_moved
+        try:
+            queue_pos_old   = self.queue_pos
+            queue_pos_new   = self.queue_pos + step
+            queue_finished  = False
+            # Verify index is within limits, stop if out of boundries
+            # This is the typical behaviour of mp3 playing software
+            # such as Rhythmbox.
+            if queue_pos_new < 0 or queue_pos_new >= len(self.queue):
+                gst.debug('queue playback completed, will stop and return to first element')
+                # queue completed, stop player and return
+                queue_pos_new  = 0
+                queue_finished = True
+            queue_moved = abs(queue_pos_new - queue_pos_old)
+
+            uri_new = self.queue[queue_pos_new]['uri']
+            gst.debug('Will set new location to %s' % uri_new)
+            self.player.set_location(uri_new)
+            # update queue position
+            self.queue_pos = queue_pos_new
+            gst.debug('New queue_pos:%d/%d' % (self.queue_pos, len(self.queue)))
+            try:
+                if(self.is_playing()):
+                    gst.debug('Will stop+play to advance in queue')
+                    self.stop()
+                    if queue_finished:
+                        gst.debug('Omiting play(), queue finished')
+                    else:
+                        self.play()
+                # Mark success
+                ans = True
+            except Exception as e:
+                print e
+                gst.error('Failed to advance in queue')
+        except Exception as e:
+            print e
+            gst.error('Problem near next()')
+        return ans,queue_moved
+
+    def play(self):
+        """
+        case player status:
+          - If stopped, starts playback (will run through queue until end)
+          - If playing/paused, toggles play/pause.
+
+        Return values:
+          - If successful [200]
+          - else: [err_code,err_message]
+        """
+        ans = [200]
+        try:
+            if self.is_playing():
+                gst.debug('Will pause player')
                 self.player.pause()
             else:
+                gst.debug('Will play player')
                 self.player.play()
-        except:
-            ans = list(self.NK)
+        except Exception as e:
+            err_msg = 'Problem near play. Exception:%s' % e.__str__()
+            ans = [400]
+            ans.append(err_msg)
         return ans
 
     def stop(self):
-        """Wrapper for player.stop()"""
+        """
+        Stops playback.
+        Wrapper for player.stop()
+        """
         ans = [200]
         try:
+            gst.debug('Will stop player')
             self.player.stop()
         except:
             ans = [400]
         return ans
 
     def is_playing(self):
-        """Wrapper for player.is_playing()"""
-        ans = [200]
+        """
+        Wrapper for player.is_playing()
+        """
+        playing = False
         try:
             playing = self.player.is_playing()
             if self.src == 'stdin':
                 print "Player state: Playing" if playing else "Player state: NOT Playing"
-            ans.append(playing)
-            gst.debug('is_playing:%r' % playing)
-        except:
+            gst.debug('status:%r' % playing)
+        except Exception as e:
+            print e
+            gst.error('Problem near is_playing()')
+        return playing
+
+    def status(self):
+        """
+        Get player playing/!playing
+
+        If metadata is available, then the answer will include it.
+
+        Return value:
+          - If successful: [200,True/False,metadata]
+          - else: [err_code]
+        """
+        ans = [200]
+        try:
+            gst.debug(self.queue.__str__())
+            playing = self.is_playing()
+            current = self.player.get_current()
+            tags    = self.queue_item_by_uri(current)
+            if not tags:
+                # Failed to find tags or search is still
+                # in progress
+                tags = {}
+            ans.append([playing,current,tags])
+        except Exception as e:
+            print e
+            gst.error('Problem near status()')
             ans = [400]
         return ans
 
     def help(self):
+        """
+        Gets a help message.
+
+        Return values:
+          - If successful [200,help_string]
+          - else: [error_code]
+        """
         ans = [200]
         try:
             help_msg = self.help_msg()
@@ -321,6 +723,9 @@ Usage example:
         return ans
 
     def help_msg(self):
+        """
+        Returns help message string.
+        """
         menu  = "\n-- Help menu --\n\nValid commands:\n\t"
         try:
             funcs = '\n\t'.join(self.handlers.keys())
@@ -330,31 +735,32 @@ Usage example:
         return "%s%s" % (menu,funcs)
 
     def is_registered(self, cmd):
+        """
+        Returns True if the command 'cmd' is registered.
+        """
         return cmd in self.handlers
 
-    def json_ans(self, cmd_code, res_code, data=[]):
-        ans = [
-            {
-                'ack':
-                    {'res_code':res_code,
-                     'cmd_code':cmd_code},
-                'data':
-                    data
-             }
-            ]
-        data_string = json.dumps(ans)
-        return data_string
-
     def handle_cmd(self, msg):
-        """Receives a msg and executes it if it corresponds to a registered cmd"""
-        words       = msg.split()
-        cmd         = words[0]
-        cmd_code    = words[-1]
+        """
+        Receives a msg and executes it if it corresponds to a registered cmd
+
+        Return values:
+          - If successful: [200,data_returned_by_cmd]
+          - else: [err_code,err_msg]
+        """
+        if self.src == 'zmq':
+            cmd,cmd_code,args = shared.json_server_dec(msg)
+            gst.debug('dec: cmd_name=%s,'\
+                          'cmd_code=%d,args=%s' % (cmd,cmd_code,args.__str__()))
+        else:
+            words       = msg.split()
+            cmd         = words[0]
+            cmd_code    = words[-1]
+            args        = []
         cmd_code_dic= 0
-        args        = []
         ans         = [200] # default to OK
 
-        if not self.is_registered(cmd) or len(words) < 2:
+        if not self.is_registered(cmd) or (self.src == 'stdin' and len(words) < 2):
             gst.error("Error: Invalid command: %s, Ignoring...\n" % cmd)
             help_msg = self.help_msg()
             if(self.src == 'stdin'):
@@ -363,14 +769,20 @@ Usage example:
             ans.append(help_msg)
         else:
             # first arg is command name, last is cmd if
-            args = words[1:-1]
-            try:
-                # get command id from dict, compare with rx id (must match)
-                gst.debug('Matching command id with dict values...')
-                cmd_code_dic = cmd_name_id[cmd]
+            if self.src == 'stdin':
+                # if src is zmq, then json_server_dec() took
+                # care of fetching arguments for command
+                args = words[1:-1]
                 try:
                     # convert from string to int
                     cmd_code = int(cmd_code)
+                except ValueError as e:
+                    gst.warning('int(cmd_code) failed!Exception:%s' % e.__str__())
+            try:
+                # get command id from dict, compare with rx id (must match)
+                gst.debug('Matching command id with dict values...')
+                cmd_code_dic = shared.cmd_name_id[cmd]
+                try:
                     # check matching
                     if cmd_code_dic != cmd_code:
                         gst.error('Command code received %d does not match dict %d'
@@ -380,9 +792,19 @@ Usage example:
                     try:
                         if(args):
                             gst.debug('Executing cmd=%s with args=%s' % (cmd,args))
-                            assert(cmd == 'load')
                             args = args[0]
-                            ans = list(self.load(args))
+                            if cmd == 'queue_add':
+                                ans = list(self.queue_add(args))
+                            elif cmd == 'queue_del':
+                                param = -1
+                                try:
+                                    param = int(args)
+                                except ValueError as e:
+                                    gst.debug('Param is not int. Exception:%s' % e.__str__())
+                                if not param == -1:
+                                    ans = list(self.queue_del(pos=param))
+                                else:
+                                    ans = list(self.queue_del(uri=args))
                             #TODO implement generic multi arg command and support for multi load (queue)
                             # ans = self.fire(cmd,args)
                         else:
@@ -407,7 +829,7 @@ Usage example:
         data = []
         if len(ans) == 2:
             data = ans[1]
-        return self.json_ans(cmd_code, ans[0], data)
+        return shared.json_server_enc(cmd_code, ans[0], data)
 
     def start(self):
         """Starts listener threads for both gst and src (stdin,zmq)"""
@@ -421,7 +843,10 @@ Usage example:
         return self.gst_listener.is_alive() and self.listener.is_alive()
 
     def quit(self):
-        """Trigger join() on listener thread to make it terminate"""
+        """
+        Trigger join() on listener thread to terminate server.
+        When threads die, the server will detect it and quit.
+        """
         ans = [200]
         try:
             gst.debug('Triggering join() on %s listener thread...' % self.src)
