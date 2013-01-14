@@ -42,6 +42,13 @@ import zmq
 import shared
 
 class GstListener(threading.Thread):
+    """
+    Thread to listen on gst bus and catch events
+    relevant to the player.
+    Takes a callback function as Class argument on _init__,
+    this callback will be executed when any message arrives
+    on the gst bus. Messages are not processes by this class.
+    """
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, verbose=None):
         threading.Thread.__init__(self, group=group, target=target,
@@ -63,6 +70,17 @@ class GstListener(threading.Thread):
         self.loop.run()
 
 class GstPlayer():
+    """
+    Gst player class
+
+    Must not be used on its own, runs within an instance
+    of PlayerControl(), which takes care of running the
+    listening threads requiered to respond to input/events.
+
+    Constructor takes a callback function as an argument. This function
+    will be called on gst.MESSAGE_EOS.
+
+    """
     def __init__(self, cb_eos=None):
         self.playing = False
         self.player  = gst.element_factory_make("playbin", "player")
@@ -151,7 +169,14 @@ class GstPlayer():
         return ans
 
 class Listener(threading.Thread):
-    """Listen on src (zmq or stdin) for incomming commands"""
+    """
+    Listen for commands on src (zmq or stdin).
+
+    Class constructor takes 3 arguments:
+      - cb  : Callback function that responds to input.
+      - src : Indicates if input will come from 'zmq' or 'stdin'
+      - port: Determines which port the 'zmq' server should bind to.
+      """
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs=None, verbose=None):
         threading.Thread.__init__(self, group=group, target=target,
@@ -208,9 +233,20 @@ class Listener(threading.Thread):
 
 class PlayerControl():
     """
-PlayerControl plays mp3 files.
-Receives commands over zmq or stdin.
-Usage example:
+    PlayerControl plays mp3 files.
+    Receives commands over zmq or stdin.
+
+    Constructor takes the following arguments:
+      - src           : Indicates if server should listen on
+      either 'stdin' or 'zmq'.
+      - port          : Port to which the 'zmq' server should
+      bind to.
+      - verify_on_load: If True, then before adding a file to the
+      queue the server will check if the file exists.
+      NOTE: In order to be able to add directories to the play
+            queue, the server must be run with verify_on_load=True
+
+    Usage example:
       pl = PlayerControl('zmq',5556)
       pl.start()
       # now run a client and send commands, loop
@@ -267,6 +303,19 @@ Usage example:
             return handler(**kwargs)
 
     def queue_add(self, location):
+        """
+        Adds location to the play queue.
+
+        NOTES:
+          - location must be a valid URI
+          - If self.verify_on_load==True, then location
+          can be a directory. All .mp3 files from the
+          directory will be loaded.
+
+        Return values:
+          - If successful: [200]
+          - else: [err_code,[err_msg]].
+        """
         ans = [200]
         is_dir = False
         is_ascii = True
@@ -438,6 +487,13 @@ Usage example:
         return ans
 
     def queue_get(self):
+        """
+        Gets the current queue.
+
+        Return values:
+          - If successful: [200,[uri1,uri2,etc]]
+          - else: [err_code,[err_message]]
+        """
         ans = [200]
         try:
             uris = []
@@ -453,6 +509,13 @@ Usage example:
         return ans
 
     def queue_clear(self):
+        """
+        Clears the current queue.
+
+        Return values:
+          - If successful: [200]
+          - else: [err_code,[err_message]]
+        """
         ans = [200]
         try:
             self.queue_pos = -1
@@ -467,8 +530,18 @@ Usage example:
         return ans
 
     def queue_next(self,step=1):
-        """Wrapper for client call to next(), adds client-server
-        protocol overhead"""
+        """
+        Advances 1 position in queue.
+        case player state:
+          - playing: the new track will start playing
+          - paused : the current track will be preserved. new track will be played
+          only if user inputs 'next' or ['stop','play'].
+          - stopped: the new track will not be played until client sends 'play'
+
+        Return values:
+          - If successful [200,positions_moved]
+          - else: [error_code]
+        """
         ans = [400]
         try:
             gst.debug('Will next_prev(%d)' % step)
@@ -483,6 +556,9 @@ Usage example:
         return ans
 
     def queue_prev(self,step=-1):
+        """
+        Just like 'queue_next()' but backwards'
+        """
         ans = [400]
         if step >= 0:
             return ans
@@ -497,7 +573,8 @@ Usage example:
         return ans
 
     def next_prev(self, step):
-        """Move queue step positions (next,back)
+        """
+        Move queue step positions (next,back)
         Returns a tuple (ok,queue_moved), where
         the value queue_moved indicates number of postions
         shifted by queue_move(), and is valid only if ok==True
@@ -551,6 +628,15 @@ Usage example:
         return ans,queue_moved
 
     def play(self):
+        """
+        case player status:
+          - If stopped, starts playback (will run through queue until end)
+          - If playing/paused, toggles play/pause.
+
+        Return values:
+          - If successful [200]
+          - else: [err_code,err_message]
+        """
         ans = [200]
         try:
             if self.is_playing():
@@ -566,7 +652,10 @@ Usage example:
         return ans
 
     def stop(self):
-        """Wrapper for player.stop()"""
+        """
+        Stops playback.
+        Wrapper for player.stop()
+        """
         ans = [200]
         try:
             gst.debug('Will stop player')
@@ -576,7 +665,9 @@ Usage example:
         return ans
 
     def is_playing(self):
-        """Wrapper for player.is_playing()"""
+        """
+        Wrapper for player.is_playing()
+        """
         playing = False
         try:
             playing = self.player.is_playing()
@@ -589,8 +680,15 @@ Usage example:
         return playing
 
     def status(self):
-        """Get player playing/!playing"""
-        #TODO return metadata if playing
+        """
+        Get player playing/!playing
+
+        If metadata is available, then the answer will include it.
+
+        Return value:
+          - If successful: [200,True/False,metadata]
+          - else: [err_code]
+        """
         ans = [200]
         try:
             gst.debug(self.queue.__str__())
@@ -609,6 +707,13 @@ Usage example:
         return ans
 
     def help(self):
+        """
+        Gets a help message.
+
+        Return values:
+          - If successful [200,help_string]
+          - else: [error_code]
+        """
         ans = [200]
         try:
             help_msg = self.help_msg()
@@ -618,6 +723,9 @@ Usage example:
         return ans
 
     def help_msg(self):
+        """
+        Returns help message string.
+        """
         menu  = "\n-- Help menu --\n\nValid commands:\n\t"
         try:
             funcs = '\n\t'.join(self.handlers.keys())
@@ -627,10 +735,19 @@ Usage example:
         return "%s%s" % (menu,funcs)
 
     def is_registered(self, cmd):
+        """
+        Returns True if the command 'cmd' is registered.
+        """
         return cmd in self.handlers
 
     def handle_cmd(self, msg):
-        """Receives a msg and executes it if it corresponds to a registered cmd"""
+        """
+        Receives a msg and executes it if it corresponds to a registered cmd
+
+        Return values:
+          - If successful: [200,data_returned_by_cmd]
+          - else: [err_code,err_msg]
+        """
         if self.src == 'zmq':
             cmd,cmd_code,args = shared.json_server_dec(msg)
             gst.debug('dec: cmd_name=%s,'\
@@ -726,7 +843,10 @@ Usage example:
         return self.gst_listener.is_alive() and self.listener.is_alive()
 
     def quit(self):
-        """Trigger join() on listener thread to make it terminate"""
+        """
+        Trigger join() on listener thread to terminate server.
+        When threads die, the server will detect it and quit.
+        """
         ans = [200]
         try:
             gst.debug('Triggering join() on %s listener thread...' % self.src)
