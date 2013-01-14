@@ -88,6 +88,7 @@ class PyzmClient:
                                 'Wait for server or force quit by typing "%s"' % (pending_acks,quit_linger))
                     elif line:
                         try:
+                            unicode(line)
                             words = line.split()
                             cmd_name = words[0]
                             args = []
@@ -104,6 +105,8 @@ class PyzmClient:
                                                       'Exception:%s' % (msg,e.__str__()))
                             except Exception as e:
                                 logging.error('Failed encode json msg. Exception:%s' % e.__str__())
+                        except UnicodeDecodeError as e:
+                            logging.error('Input must be unicode')
                         except Exception as e:
                             logging.error('Exception:' % e.__str__())
 

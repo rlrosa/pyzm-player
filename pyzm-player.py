@@ -269,10 +269,20 @@ Usage example:
     def queue_add(self, location):
         ans = [200]
         is_dir = False
-        if not gst.uri_is_valid(location):
-            gst.error("Error: Invalid URI: %s\nExpected uri"
+        is_ascii = True
+        # ignore non-ascii stuff
+        try:
+            unicode(location)
+        except UnicodeDecodeError as e:
+            is_ascii = False
+            gst.warning('Ignoring %s, not ascii' % location)
+            ans = [406]
+            ans.append(e.__str__())
+        if not is_ascii or not gst.uri_is_valid(location):
+            if is_ascii:
+                gst.error("Error: Invalid URI: %s\nExpected uri"
                       "like file:///home/foo/bar.mp3\nIgnoring...\n" % location)
-            ans = [403]
+                ans = [403]
         else:
             # if(self.player.status()):
             #     self.queued = True

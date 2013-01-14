@@ -12,6 +12,7 @@ r_codes = {
     403: 'Invalid URI',    # NK: Invalid URI
     404: 'URI not found!', # NK: URI not found
     405: 'Encoder fail',   # NK: Failed to encode json msg
+    406: 'Non ascii',      # NK: Invalid file name
 }
 
 cmd_id_name = {
