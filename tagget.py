@@ -121,7 +121,7 @@ class TagGetter:
         Callback for timeout, used in case tag messages do not include
         all the information required by self.req_keys.
         """
-        gst.warning('Timed out before getting tag')
+        gst.warning('Timed out before getting tag for %s' % self.pbin.get_property('uri'))
         self.quit()
         return False
 
