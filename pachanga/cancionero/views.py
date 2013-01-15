@@ -43,16 +43,6 @@ def index(request):
             # save whatever we managed to get (maybe nothing)
             song_list.insert(0,"%s - %s" % (title,album))
 
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print 'song list:',song_list
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print '-- -- -- --'
-
     ans = cl.send_recv("status")
     if ans[0] == 200:
         try:
