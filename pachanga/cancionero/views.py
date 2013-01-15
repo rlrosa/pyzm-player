@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 import cancionero.shared as shared
 import logging
 import zmq
+from pyzm_client import PyzmClient
 from cancionero.models import Song
 
 def index(request):
@@ -36,29 +37,9 @@ def addSong(request):
 @csrf_exempt
 def addToPlayList(request):
   
-    #Comunicacion con el player
     url = request.POST.get('url')
-    print "URL: ",url
-    context = zmq.Context()
-    sender  = context.socket(zmq.REQ)
-    sender.connect('tcp://%s:%d' % ("127.0.0.1",5555 ))
-    
-    
-    msg = shared.json_client_enc("queue_add", [url])
-    print "MENSAJE: ", msg
-    try:
-	sender.send(msg, copy=True)
-    except Exception as e:
-	logging.error('Failed to send "%s" via zmq!'\
-			  'Exception:%s' % (msg,e.__str__()))
-
-    ack = sender.recv()
-    logging.debug('Raw data:%s' % ack)
-    
-    sender.close()
-    context.term()
-    #fin coso player
-       
+    cl = PyzmClient("127.0.0.1", 5555)
+    cl.send_recv("queue_add", [url]);
     
     song_list = Song.objects.all()
     template = loader.get_template('cancionero/index.html')
@@ -70,26 +51,8 @@ def addToPlayList(request):
 @csrf_exempt
 def play(request):
   
-    #Comunicacion con el player
-
-    context = zmq.Context()
-    sender  = context.socket(zmq.REQ)
-    sender.connect('tcp://%s:%d' % ("127.0.0.1",5555 ))
-    print "PLAY"
-    msg = shared.json_client_enc("play")
-    try:
-	sender.send(msg, copy=True)
-    except Exception as e:
-	logging.error('Failed to send "%s" via zmq!'\
-			  'Exception:%s' % (msg,e.__str__()))
-    
-    
-    ack = sender.recv()
-    logging.debug('Raw data:%s' % ack)
-    
-    sender.close()
-    context.term()
-    #fin coso player
+    cl = PyzmClient("127.0.0.1", 5555)
+    cl.send_recv("play");
        
     
     song_list = Song.objects.all()
@@ -102,26 +65,37 @@ def play(request):
 @csrf_exempt
 def stop(request):
   
-    #Comunicacion con el player
+    cl = PyzmClient("127.0.0.1", 5555)
+    cl.send_recv("stop");
+       
+    
+    song_list = Song.objects.all()
+    template = loader.get_template('cancionero/index.html')
+    context = Context({
+        'song_list': song_list,
+    })
+    return HttpResponseRedirect(reverse('cancionero:index'))
+    
+    
+@csrf_exempt
+def nextSong(request):
+  
+    cl = PyzmClient("127.0.0.1", 5555)
+    cl.send_recv("queue_next");
+       
+    
+    song_list = Song.objects.all()
+    template = loader.get_template('cancionero/index.html')
+    context = Context({
+        'song_list': song_list,
+    })
+    return HttpResponseRedirect(reverse('cancionero:index'))
 
-    context = zmq.Context()
-    sender  = context.socket(zmq.REQ)
-    sender.connect('tcp://%s:%d' % ("127.0.0.1",5555 ))
-    print "STOP"
-    msg = shared.json_client_enc("stop")
-    try:
-	sender.send(msg, copy=True)
-    except Exception as e:
-	logging.error('Failed to send "%s" via zmq!'\
-			  'Exception:%s' % (msg,e.__str__()))
-    
-    
-    ack = sender.recv()
-    logging.debug('Raw data:%s' % ack)
-    
-    sender.close()
-    context.term()
-    #fin coso player
+@csrf_exempt
+def prev(request):
+  
+    cl = PyzmClient("127.0.0.1", 5555)
+    cl.send_recv("queue_prev");
        
     
     song_list = Song.objects.all()

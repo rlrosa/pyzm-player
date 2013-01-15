@@ -1,3 +1,11 @@
+<html>
+<head>
+<title>Pachanga</title>
+<META HTTP-EQUIV="REFRESH" CONTENT="5;URL=">
+</head>
+<body>
+
+
 {% load url from future %}
 
 <p align=center>
@@ -28,16 +36,34 @@
 
       <select name="playList" MULTIPLE size="10">
       </select>-->
+<TABLE>    
+<TR>
+<TD>
 <form action="{% url 'cancionero:play' %}" method="post" >
 {% csrf_token %}
 <input type="submit" value="Play" />
 </form>
-
+</TD>
+<TD>
 <form action="{% url 'cancionero:stop' %}" method="post" >
 {% csrf_token %}
 <input type="submit" value="Stop" />
 </form>
-
+</TD>
+<TD>
+<form action="{% url 'cancionero:nextSong' %}" method="post" >
+{% csrf_token %}
+<input type="submit" value="Next" />
+</form>
+</TD>
+<TD>
+<form action="{% url 'cancionero:prev' %}" method="post" >
+{% csrf_token %}
+<input type="submit" value="Prev" />
+</form>
+</TD>
+</TR>
+</TABLE>
 <!--<input type=button onclick="next()" value="Next">
 <input type=button onclick="forward()" value="Forward">
 <input type=button onclick="delete()" value="Delete">-->
@@ -95,9 +121,6 @@ function addToPlayList(){
    var url = document.formNewSong.url.value;
    var n = document.formNewSong.author.value;
    var nombre = document.formNewSong.style.value;
-
-   
-   
    return true;
 
 }
@@ -118,3 +141,5 @@ function forward(){
 function delete(){
 }
 </script> 
+</body>
+</html> 

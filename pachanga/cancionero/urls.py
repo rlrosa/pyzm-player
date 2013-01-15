@@ -8,6 +8,8 @@ urlpatterns = patterns('',
     url(r'^/addToPlayList$', views.addToPlayList,  name='addToPlayList'),
     url(r'^/play$', views.play,  name='play'),
     url(r'^/stop$', views.stop,  name='stop'),
+    url(r'^/nextSong', views.nextSong,  name='nextSong'),
+    url(r'^/prev', views.prev,  name='prev'),
 )
 
 
