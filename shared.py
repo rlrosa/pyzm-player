@@ -13,6 +13,8 @@ r_codes = {
     404: 'URI not found!', # NK: URI not found
     405: 'Encoder fail',   # NK: Failed to encode json msg
     406: 'Non ascii',      # NK: Invalid file name
+    407: 'Timeout',        # NK: Timeout during execution
+    408: 'zmq state',      # NK: Invalid zmq state
 }
 
 cmd_id_name = {

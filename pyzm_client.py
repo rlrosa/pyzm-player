@@ -31,7 +31,7 @@ class PyzmClient:
     poller  = None
     port    = None
 
-    def __init__(self, server, port):
+    def __init__(self, server='127.0.0.1', port=5555):
         self.server  = server
         self.port    = port
         self.context = zmq.Context()
@@ -39,7 +39,6 @@ class PyzmClient:
         self.sender.connect('tcp://%s:%d' % (server,port))
         self.poller  = zmq.Poller()
         self.poller.register(self.sender, zmq.POLLIN)
-        self.poller.register(sys.stdin, zmq.POLLIN)
         self.pending_acks = 0
 
     def __enter__(self):
@@ -48,23 +47,29 @@ class PyzmClient:
     def __del__(self):
         """ Cleanup zmq stuff if any exists """
         print "Terminating client..."
-        if(self.context != None):
-            logging.debug('Cleaning up zmq')
-            if(self.sender != None):
-                logging.debug('Closing sender socket...')
-                self.sender.close()
-            logging.debug('Terminating zmq context')
-            self.context.term()
-            logging.debug('zmq cleanup completed!')
+        self.quit(force=True)
 
     def quit(self,force=False):
         # cleanup is performed by self.__del__()
-        if(force):
+        self.do_run = False
+        if force and self.sender != None:
             logging.debug('Discarding pending answers')
             self.sender.setsockopt(zmq.LINGER,0)
-        sys.exit(0)
+        if force or self.pending_acks == 0:
+            if(self.context != None):
+                logging.debug('Cleaning up zmq')
+                if(self.sender != None):
+                    logging.debug('Closing sender socket...')
+                    self.sender.close()
+                    self.sender = None
+                    logging.debug('Terminating zmq context')
+                    self.context.term()
+                    self.context = None
+                    logging.debug('zmq cleanup completed!')
 
     def send(self,cmd_name,args=[]):
+        if self.pending_acks > 0:
+            ans = [408]
         try:
             msg = shared.json_client_enc(cmd_name,args)
             try:
@@ -76,9 +81,17 @@ class PyzmClient:
         except Exception as e:
             logging.error('Failed encode json msg. Exception:%s' % e.__str__())
 
-    def recv(self):
+    def recv(self, timeout=5000):
         ans = []
         try:
+            socks = dict(self.poller.poll(timeout))
+            if not socks or not socks.get(self.sender, False):
+                # did not get answer from server
+                logging.error('Timed out waiting for answer from server')
+                ans = [407]
+                ans.append(shared.r_codes[ans[0]])
+                return ans
+            logging.debug('Will recv()')
             ack = self.sender.recv()
             logging.debug('Raw data:%s' % ack)
             self.pending_acks-=1
@@ -92,25 +105,42 @@ class PyzmClient:
             except:
                 print 'ERROR: failed to decode json. Raw data:\n%s' % ack
         except Exception as e:
+            print e
             logging.error('recv(): %s' % e.__str__())
         return ans
 
-    def send_recv(self,cmd_name,args=[]):
+    def send_recv(self,cmd_name,args=[],timeout=5000):
+        """
+        Will send a command via zmq and wait (blocking)
+        for an answer from the client for up to 'timeout'
+        miliseconds.
+
+        Arguments:
+          - cmd_name: Name of command to execute (see shared.py)
+          - args    : List of string to send as arguments to cmd
+          - timeout : Max time to wait for answer from player (ms)
+        """
         try:
-            self.send(cmd_name,args)
-            self.recv()
+            ans = self.send(cmd_name,args)
+            if not ans[0] == 200:
+                return ans
+            if not ans[0] == 200:
+                return ans
         except Exception as e:
             print e
 
     def run(self):
         quit_cmd = 'qqq'
         quit_linger = 'qqqq'
+        self.do_run = True
+        self.poller.register(sys.stdin, zmq.POLLIN)
+
         print "Will send stdin via zmq.\n"\
             "Example:\n"\
             "\tplay file:///tmp/audio1.mp3,file:///tmp/audio2.mp3\n"\
             "\tstop\n\n"\
             "To quit type: %s" % quit_cmd
-        while True:
+        while self.do_run:
             socks = dict(self.poller.poll(500))
             if socks:
                 if socks.get(self.sender, False):
