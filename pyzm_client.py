@@ -111,7 +111,7 @@ class PyzmClient:
             self.pending_acks-=1
             try:
                 cmd_code,cmd_res,data,dec = shared.json_client_dec(ack)
-                ans = [cmd_code,cmd_res,data,dec]
+                ans = [cmd_res,cmd_code,data,dec]
                 logging.debug('will json.dumps to print data on screen')
                 print 'DECODED:',json.dumps(dec,indent=2)
                 if data:
