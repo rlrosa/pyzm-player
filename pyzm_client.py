@@ -31,7 +31,7 @@ class PyzmClient:
     poller  = None
     port    = None
 
-    def __init__(self, server, port):
+    def __init__(self, server='127.0.0.1', port=5555):
         self.server  = server
         self.port    = port
         self.context = zmq.Context()
