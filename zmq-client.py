@@ -26,6 +26,7 @@ class PyzmClient:
         self.poller  = zmq.Poller()
         self.poller.register(self.sender, zmq.POLLIN)
         self.poller.register(sys.stdin, zmq.POLLIN)
+        self.pending_acks = 0
 
     def __enter__(self):
         return self
@@ -49,10 +50,47 @@ class PyzmClient:
             self.sender.setsockopt(zmq.LINGER,0)
         sys.exit(0)
 
+    def send(self,cmd_name,args=[]):
+        try:
+            msg = shared.json_client_enc(cmd_name,args)
+            try:
+                self.sender.send(msg, copy=True)
+                self.pending_acks+=1
+            except Exception as e:
+                logging.error('Failed to send "%s" via zmq!'\
+                                  'Exception:%s' % (msg,e.__str__()))
+        except Exception as e:
+            logging.error('Failed encode json msg. Exception:%s' % e.__str__())
+
+    def recv(self):
+        ans = []
+        try:
+            ack = self.sender.recv()
+            logging.debug('Raw data:%s' % ack)
+            self.pending_acks-=1
+            try:
+                cmd_code,cmd_res,data,dec = shared.json_client_dec(ack)
+                ans = [cmd_code,cmd_res,data,dec]
+                logging.debug('will json.dumps to print data on screen')
+                print 'DECODED:',json.dumps(dec,indent=2)
+                if data:
+                    print 'DATA:',data
+            except:
+                print 'ERROR: failed to decode json. Raw data:\n%s' % ack
+        except Exception as e:
+            logging.error('recv(): %s' % e.__str__())
+        return ans
+
+    def send_recv(self,cmd_name,args=[]):
+        try:
+            self.send(cmd_name,args)
+            self.recv()
+        except Exception as e:
+            print e
+
     def run(self):
         quit_cmd = 'qqq'
         quit_linger = 'qqqq'
-        pending_acks = 0
         print "Will send stdin via zmq.\n"\
             "Example:\n"\
             "\tplay file:///tmp/audio1.mp3,file:///tmp/audio2.mp3\n"\
@@ -63,29 +101,19 @@ class PyzmClient:
             if socks:
                 if socks.get(self.sender, False):
                     # got message from server
-                    ack = self.sender.recv()
-                    logging.debug('Raw data:%s' % ack)
-                    try:
-                        cmd_code,cmd_res,data,dec = shared.json_client_dec(ack)
-                        logging.debug('will json.dumps to print data on screen')
-                        print 'DECODED:',json.dumps(dec,indent=2)
-                        if data:
-                            print 'DATA:',data
-                    except:
-                        print 'ERROR: failed to decode json. Raw data:\n%s' % ack
-                    pending_acks-=1
+                    ans = self.recv()
                 if socks.get(sys.stdin.fileno(), False):
                     # got stdin input
                     line = raw_input('')
                     if line == quit_cmd or line == quit_linger:
                         if(line == quit_linger):
                             self.quit(force=True)
-                        if(pending_acks==0):
+                        if(self.pending_acks==0):
                             self.quit()
                         else:
                             logging.warn('There are %d answers pending, cannot terminate '\
                                 'zmq context cleanly.\n'\
-                                'Wait for server or force quit by typing "%s"' % (pending_acks,quit_linger))
+                                'Wait for server or force quit by typing "%s"' % (self.pending_acks,quit_linger))
                     elif line:
                         try:
                             unicode(line)
@@ -95,16 +123,7 @@ class PyzmClient:
                             # now fetch args
                             if(len(words) > 1):
                                 args = ' '.join(words[1:]).split(',')
-                            try:
-                                msg = shared.json_client_enc(cmd_name,args)
-                                try:
-                                    self.sender.send(msg, copy=True)
-                                    pending_acks+=1
-                                except Exception as e:
-                                    logging.error('Failed to send "%s" via zmq!'\
-                                                      'Exception:%s' % (msg,e.__str__()))
-                            except Exception as e:
-                                logging.error('Failed encode json msg. Exception:%s' % e.__str__())
+                            self.send(cmd_name,args)
                         except UnicodeDecodeError as e:
                             logging.error('Input must be unicode')
                         except Exception as e:
