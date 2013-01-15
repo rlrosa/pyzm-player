@@ -79,8 +79,7 @@ class PyzmClient:
                 ans = [200]
             except Exception as e:
                 ans = [400]
-                err_msg = 'Failed to send "%s" via zmq!'\
-                    'Exception:%s' % msg,e.__str__()
+                err_msg = 'Failed to send "%s" via zmq! Exception:%s' % (msg,e.__str__())
                 ans.append(err_msg)
                 logging.error(err_msg)
         except Exception as e:
