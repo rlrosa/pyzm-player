@@ -11,10 +11,29 @@ from pyzm_client import PyzmClient
 from cancionero.models import Song
 
 def index(request):
-    song_list = Song.objects.all()
+    
+    cl = PyzmClient("127.0.0.1", 5555)
+    
+    ans = cl.send_recv("queue_get")
+    song_list = []
+    for track in ans[2]:
+      song_list.insert(0, track['tags']['title'])
+    
+    ans = cl.send_recv("status")
+    song_title = ans[2][2]['tags']['title']
+    song_artist = ans[2][2]['tags']['artist']
+    song_genre = ans[2][2]['tags']['genre']
+    song_album = ans[2][2]['tags']['album']
+    
+    song_DB = Song.objects.all()
     template = loader.get_template('cancionero/index.html')
     context = Context({
         'song_list': song_list,
+        'song_DB': song_DB,
+        'song_title': song_title,
+        'song_artist': song_artist,
+        'song_genre': song_genre,
+        'song_album': song_album,
     })
     return HttpResponse(template.render(context))
   
@@ -52,7 +71,7 @@ def addToPlayList(request):
 def play(request):
   
     cl = PyzmClient("127.0.0.1", 5555)
-    cl.send_recv("play");
+    cl.send_recv("play")
        
     
     song_list = Song.objects.all()

@@ -17,25 +17,8 @@
 </p>
 
 
-{% if song_list %}
-      <ul>
-      <p>
-      <select name="songsList" MULTIPLE size="10">
-      {% for song in song_list %}
-  <!--        <li>{{ song.songName }}</li>-->
-	  <option>{{ song.songName }}-{{ song.songAuthor }}</option>
-      {% endfor %}
 
-      </select>
-      </p>
-      </ul>
-{% else %}
-    <p>List empty.</p>
-{% endif %}
-<!--<input type=button onclick="addToPlayList()" value="Add To PlayList">
 
-      <select name="playList" MULTIPLE size="10">
-      </select>-->
 <TABLE>    
 <TR>
 <TD>
@@ -64,15 +47,89 @@
 </TD>
 </TR>
 </TABLE>
+
+
+<TABLE> 
+<TR>
+<TD>
+
+
+
+{% if song_DB %}
+      <ul>
+      Data Base
+      <p>
+      <form action="{% url 'cancionero:addToPlayList' %}" method="post" >
+      <div>
+      <select name="song_DB" MULTIPLE size="10">
+      {% for song in song_DB %}
+         <li>{{ song.songName }}</li>
+	  <option>{{ song.songName }}-{{ song.songAuthor }}</option>
+      {% endfor %}
+      
+	<input type="submit" value="Add to PlayList" />
+      </select>
+      </div>
+      </form>
+      </p>
+      </ul>
+{% else %}
+    <p>List empty.</p>
+{% endif %}
+
+
+</TD>
+<TD>
+
+
+      <ul>
+      Play List
+      <p>
+      
+      <select name="songsList" size="10">
+      {% for song in song_list %}
+         <li>{{ song }}</li>
+	  <option>{{ song }}</option>
+      {% endfor %}
+
+      </select>
+      </p>
+      </ul>
+
+</TD>
+
+<TD>
+
+      <ul>
+      What's playing?
+      <p>         
+         <li>Name: {{song_title }}</li>
+         <li>Artist: {{song_artist }}</li>
+         <li>Genre: {{song_genre }}</li>
+         <li>Album: {{song_album }}</li>
+      </p>
+      </ul>
+
+
+
+</TD>
+</TR>
+</TABLE>
 <!--<input type=button onclick="next()" value="Next">
 <input type=button onclick="forward()" value="Forward">
 <input type=button onclick="delete()" value="Delete">-->
 
+<BR>
 <form action="{% url 'cancionero:addToPlayList' %}" method="post" >
 {% csrf_token %}
 URL:
 <input name="url" >
 <input type="submit" value="Add to PlayList" />
+<p align=left>
+<i>
+<font size=2> Para agregar a la cola de reproducción sin agregar a la base de datos </font>
+</i> 
+</p>
 </form>
 
 
