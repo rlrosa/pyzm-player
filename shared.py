@@ -125,9 +125,11 @@ def json_client_enc(cmd_name,args=[]):
         try:
             enc = json.dumps(msg)
         except (ValueError,TypeError) as e:
-            print 'ERROR:', e
+            print 'Exception:', e
+            raise e
     except KeyError as e:
-        print e
+        print 'Invalid command name:',e
+        raise e
     return enc
 
 
