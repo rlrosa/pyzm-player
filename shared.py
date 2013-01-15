@@ -34,6 +34,12 @@ cmd_id_name = {
 
 cmd_name_id = dict((v,k) for k, v in cmd_id_name.iteritems())
 
+req_keys = ['artist',
+            'title',
+            'album',
+            'genre',
+            ]
+
 def json_server_enc(cmd_code, res_code=[], data=[]):
     """
     Returns a json encoded server answer msg including:
