@@ -100,15 +100,18 @@
 
 <TD>
 
-      <ul>
-      What's playing?
-      <p>         
-         <li>Name: {{song_title }}</li>
-         <li>Artist: {{song_artist }}</li>
-         <li>Genre: {{song_genre }}</li>
-         <li>Album: {{song_album }}</li>
-      </p>
-      </ul>
+  <ul>
+    What's playing?
+    {% if not playing %}
+    (Player Paused)
+    {% endif %}
+    <p>
+      <li>Name: {{song_title }}</li>
+      <li>Artist: {{song_artist }}</li>
+      <li>Genre: {{song_genre }}</li>
+      <li>Album: {{song_album }}</li>
+    </p>
+  </ul>
 
 
 
@@ -199,4 +202,5 @@ function delete(){
 }
 </script> 
 </body>
-</html> 
+</html>
+

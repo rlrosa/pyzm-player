@@ -19,6 +19,7 @@ def index(request):
     song_artist = 'unknown'
     song_genre  = 'unknown'
     song_album  = 'unknown'
+    playing     = False
 
     ans = cl.send_recv("queue_get")
     if ans[0] == 200:
@@ -43,18 +44,12 @@ def index(request):
             # save whatever we managed to get (maybe nothing)
             song_list.insert(0,"%s - %s" % (title,album))
 
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print 'song list:',song_list
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print '-- -- -- --'
-    print '-- -- -- --'
-
     ans = cl.send_recv("status")
     if ans[0] == 200:
+        try:
+            playing = ans[2][0]
+        except (IndexError) as e:
+            logging.warning(e)
         try:
             song_title = ans[2][2]['tags']['title']
         except (KeyError,IndexError) as e:
@@ -81,6 +76,7 @@ def index(request):
         'song_artist': song_artist,
         'song_genre' : song_genre,
         'song_album' : song_album,
+        'playing'    : playing,
     })
     return HttpResponse(template.render(context))
   
