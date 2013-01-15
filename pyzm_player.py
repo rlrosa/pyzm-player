@@ -487,6 +487,9 @@ class PlayerControl():
         return ans
 
     def queue_get(self):
+        """
+        Returns full queue info: uri and tag info.
+        """
         gst.debug('Will get complete queue info')
         return self.queue_info(False)
 
@@ -495,7 +498,12 @@ class PlayerControl():
         Gets the current queue.
 
         Return values:
-          - If successful: [200,[uri1,uri2,etc]]
+          - If successful: [200,data]
+              if only_uri:
+                data=['file:///etc.mp3','http://another.mp3']
+              else:
+                data is a list, each entry e is a dict:
+                  e = {'uri':'file:///etc.mp3','tags':{'title':'song name',...}}
           - else: [err_code,[err_message]]
         """
         ans = [200]
