@@ -5,6 +5,8 @@ import sys
 import gst
 import gobject
 
+from shared import req_keys
+
 class TagGetter:
     """
     Class to fetch metadata info from file.
@@ -44,11 +46,7 @@ class TagGetter:
         self.mainloop = gobject.MainLoop()
 
         # required tag fields
-        self.req_keys = ['artist',
-                         'title',
-                         'album',
-                         'genre',
-                         ]
+        self.req_keys = req_keys
         gst.debug('Will attempt to fetch at least:%s' % self.req_keys.__str__())
 
     def bus_message_tag (self, bus, message):

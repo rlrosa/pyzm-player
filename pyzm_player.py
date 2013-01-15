@@ -487,6 +487,10 @@ class PlayerControl():
         return ans
 
     def queue_get(self):
+        gst.debug('Will get complete queue info')
+        return self.queue_info(False)
+
+    def queue_info(self,only_uri=False):
         """
         Gets the current queue.
 
@@ -496,11 +500,15 @@ class PlayerControl():
         """
         ans = [200]
         try:
-            uris = []
-            for elem in self.queue:
-                uris.append(elem['uri'])
-            gst.debug('Current queue:\n\t%s' % '\n\t'.join(uris))
-            ans.append(uris)
+            if not only_uri:
+                gst.debug('Appending full queue info to ans')
+                ans.append(self.queue)
+            else:
+                uris = []
+                for elem in self.queue:
+                    uris.append(elem['uri'])
+                    gst.debug('Current queue:\n\t%s' % '\n\t'.join(uris))
+                ans.append(uris)
         except Exception as e:
             err_msg = 'Problem in queue_get. Exception:%s' % e.__str__()
             gst.debug(err_msg)

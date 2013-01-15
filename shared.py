@@ -34,6 +34,12 @@ cmd_id_name = {
 
 cmd_name_id = dict((v,k) for k, v in cmd_id_name.iteritems())
 
+req_keys = ['artist',
+            'title',
+            'album',
+            'genre',
+            ]
+
 def json_server_enc(cmd_code, res_code=[], data=[]):
     """
     Returns a json encoded server answer msg including:
@@ -119,9 +125,11 @@ def json_client_enc(cmd_name,args=[]):
         try:
             enc = json.dumps(msg)
         except (ValueError,TypeError) as e:
-            print 'ERROR:', e
+            print 'Exception:', e
+            raise e
     except KeyError as e:
-        print e
+        print 'Invalid command name:',e
+        raise e
     return enc
 
 
