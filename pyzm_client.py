@@ -10,7 +10,21 @@ import json
 import shared
 
 class PyzmClient:
-    """Simple command-line to zmq client for pyzm-player"""
+    """
+    Simple zmq client for pyzm_player.
+    Can be used as a class, manually, or launched as a listener
+    for stdin input.
+
+    Example usage in main thread:
+      cl = PyzmClient('192.168.0.101',5555)
+      cl.send_recv('queue_add',['http:///www.mysite.com/tmp/file.mp3'])
+      cl.send_recv('play')
+      cl.send_recv('stop')
+    Example as cmd line interface:
+      cl = PyzmClient('192.168.0.101',5555)
+      cl.run()
+      # trigger quit from command line
+    """
     context = None
     sender  = None
     server  = None
