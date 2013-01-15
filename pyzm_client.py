@@ -68,15 +68,21 @@ class PyzmClient:
                     logging.debug('zmq cleanup completed!')
 
     def send(self,cmd_name,args=[]):
+        logging.debug('Will try to send.')
         ans = [400]
         if self.pending_acks > 0:
+            logging.warn('Acks pending, will not send.')
             ans = [408]
         try:
+            logging.debug('Creating json message.')
             msg = shared.json_client_enc(cmd_name,args)
+            logging.debug(json.dumps(msg,indent=2))
             try:
+                logging.debug('Will zmq send()')
                 self.sender.send(msg, copy=True)
                 self.pending_acks+=1
                 ans = [200]
+                logging.debug('zmq send() ok')
             except Exception as e:
                 ans = [400]
                 err_msg = 'Failed to send "%s" via zmq! Exception:%s' % (msg,e.__str__())
