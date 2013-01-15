@@ -68,6 +68,7 @@ class PyzmClient:
                     logging.debug('zmq cleanup completed!')
 
     def send(self,cmd_name,args=[]):
+        ans = [400]
         if self.pending_acks > 0:
             ans = [408]
         try:
@@ -75,11 +76,19 @@ class PyzmClient:
             try:
                 self.sender.send(msg, copy=True)
                 self.pending_acks+=1
+                ans = [200]
             except Exception as e:
-                logging.error('Failed to send "%s" via zmq!'\
-                                  'Exception:%s' % (msg,e.__str__()))
+                ans = [400]
+                err_msg = 'Failed to send "%s" via zmq!'\
+                    'Exception:%s' % msg,e.__str__()
+                ans.append(err_msg)
+                logging.error(err_msg)
         except Exception as e:
-            logging.error('Failed encode json msg. Exception:%s' % e.__str__())
+            ans = [400]
+            err_msg = 'Failed encode json msg. Exception:%s' % e.__str__()
+            ans.append(err_msg)
+            logging.error(err_msg)
+        return ans
 
     def recv(self, timeout=5000):
         ans = []
@@ -120,14 +129,19 @@ class PyzmClient:
           - args    : List of string to send as arguments to cmd
           - timeout : Max time to wait for answer from player (ms)
         """
+        ans = [400]
         try:
             ans = self.send(cmd_name,args)
             if not ans[0] == 200:
                 return ans
+            ans = self.recv(timeout)
             if not ans[0] == 200:
                 return ans
         except Exception as e:
+            ans = [400]
+            ans.append(e.__str__())
             print e
+        return ans
 
     def run(self):
         quit_cmd = 'qqq'
