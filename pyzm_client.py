@@ -121,8 +121,9 @@ class PyzmClient:
           - timeout : Max time to wait for answer from player (ms)
         """
         try:
-            self.send(cmd_name,args)
-            ans = self.recv()
+            ans = self.send(cmd_name,args)
+            if not ans[0] == 200:
+                return ans
             if not ans[0] == 200:
                 return ans
         except Exception as e:
