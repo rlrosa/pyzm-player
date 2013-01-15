@@ -13,27 +13,74 @@ from cancionero.models import Song
 def index(request):
     
     cl = PyzmClient("127.0.0.1", 5555)
-    
+
+    song_list   = []
+    song_title  = 'unknown'
+    song_artist = 'unknown'
+    song_genre  = 'unknown'
+    song_album  = 'unknown'
+
     ans = cl.send_recv("queue_get")
-    song_list = []
-    for track in ans[2]:
-      song_list.insert(0, track['tags']['title'])
-    
+    if ans[0] == 200:
+        logging.debug('queue_get ok, analyzing answer')
+        for track in ans[2]:
+            logging.debug(track)
+            uri   = ''
+            title  = 'unknown'
+            album = 'unknown'
+            try:
+                uri  = track['uri']
+            except KeyError as e:
+                logging.info('Incomplete track info for track')
+            try:
+                title = track['tags']['title']
+            except KeyError as e:
+                logging.info('Incomplete track info for %s' % uri)
+            try:
+                album = track['tags']['album']
+            except KeyError as e:
+                logging.info('Incomplete track info for %s' % uri)
+            # save whatever we managed to get (maybe nothing)
+            song_list.insert(0,"%s - %s" % (title,album))
+
+    print '-- -- -- --'
+    print '-- -- -- --'
+    print '-- -- -- --'
+    print '-- -- -- --'
+    print 'song list:',song_list
+    print '-- -- -- --'
+    print '-- -- -- --'
+    print '-- -- -- --'
+    print '-- -- -- --'
+
     ans = cl.send_recv("status")
-    song_title = ans[2][2]['tags']['title']
-    song_artist = ans[2][2]['tags']['artist']
-    song_genre = ans[2][2]['tags']['genre']
-    song_album = ans[2][2]['tags']['album']
-    
+    if ans[0] == 200:
+        try:
+            song_title = ans[2][2]['tags']['title']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+        try:
+            song_artist = ans[2][2]['tags']['artist']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+        try:
+            song_genre = ans[2][2]['tags']['genre']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+        try:
+            song_album = ans[2][2]['tags']['album']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+
     song_DB = Song.objects.all()
     template = loader.get_template('cancionero/index.html')
     context = Context({
-        'song_list': song_list,
-        'song_DB': song_DB,
-        'song_title': song_title,
+        'song_list'  : song_list,
+        'song_DB'    : song_DB,
+        'song_title' : song_title,
         'song_artist': song_artist,
-        'song_genre': song_genre,
-        'song_album': song_album,
+        'song_genre' : song_genre,
+        'song_album' : song_album,
     })
     return HttpResponse(template.render(context))
   
