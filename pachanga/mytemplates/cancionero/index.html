@@ -21,6 +21,12 @@
   pl_old.empty()
   pl_old.append(pl_new)
 
+  // update song db
+  db_new = $("#song_DB", data);
+  db_old = $("#song_DB");
+  db_old.empty()
+  db_old.append(db_new)
+
   }
   );
 
@@ -86,7 +92,7 @@
 <TD>
 
 
-
+<div id="song_DB">
 {% if song_DB %}
       <ul>
       Data Base
@@ -107,7 +113,7 @@
 {% else %}
     <p>List empty.</p>
 {% endif %}
-
+</div>
 
 </TD>
 <TD>
