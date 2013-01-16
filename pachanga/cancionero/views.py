@@ -22,13 +22,14 @@ def index(request):
     playing     = False
 
     ans = cl.send_recv("queue_get")
+    index = 0
     if ans[0] == 200:
         logging.debug('queue_get ok, analyzing answer')
         for track in ans[2]:
             logging.debug(track)
             uri   = ''
-            title  = 'unknown'
-            album = 'unknown'
+            title  = 'Loading'
+            album = 'Loading'
             try:
                 uri  = track['uri']
             except KeyError as e:
@@ -42,7 +43,10 @@ def index(request):
             except KeyError as e:
                 logging.info('Incomplete track info for %s' % uri)
             # save whatever we managed to get (maybe nothing)
-            song_list.insert(0,"%s - %s" % (title,album))
+            
+            aux = [index, "%s - %s" % (title,album)]
+            song_list.append(aux)
+            index = index + 1
 
     ans = cl.send_recv("status")
     if ans[0] == 200:
@@ -98,7 +102,7 @@ def addSong(request):
     
 @csrf_exempt
 def addToPlayList(request):
-  
+    #listS = request.POST['song_DB'] 
     url = request.POST.get('url')
     cl = PyzmClient("127.0.0.1", 5555)
     cl.send_recv("queue_add", [url]);
@@ -110,6 +114,56 @@ def addToPlayList(request):
     })
     return HttpResponseRedirect(reverse('cancionero:index'))
     
+    
+@csrf_exempt
+def removeFromPL(request):
+  
+    listS = request.POST.getlist('songsList')
+    cl = PyzmClient("127.0.0.1", 5555)
+    for s in listS:
+      print "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr:", s
+      cl.send_recv("queue_del", s);      
+      
+    song_list = Song.objects.all()
+    template = loader.get_template('cancionero/index.html')
+    context = Context({
+        'song_list': song_list,
+    })
+    return HttpResponseRedirect(reverse('cancionero:index'))
+    
+    
+@csrf_exempt
+def dbToPlayList(request):
+    listS = request.POST.getlist('song_DB')
+    
+
+    cl = PyzmClient("127.0.0.1", 5555)
+    for s in listS:
+      songToPl = Song.objects.get(pk=s)
+      cl.send_recv("queue_add", [songToPl.songSource]);
+    
+    song_list = Song.objects.all()
+    template = loader.get_template('cancionero/index.html')
+    context = Context({
+        'song_list': song_list,
+    })
+    return HttpResponseRedirect(reverse('cancionero:index'))
+ 
+ 
+@csrf_exempt
+def queueClear(request):
+  
+    cl = PyzmClient("127.0.0.1", 5555)
+    cl.send_recv("queue_clear");
+    
+    song_list = Song.objects.all()
+    template = loader.get_template('cancionero/index.html')
+    context = Context({
+        'song_list': song_list,
+    })
+    return HttpResponseRedirect(reverse('cancionero:index'))
+ 
+ 
 @csrf_exempt
 def play(request):
   
