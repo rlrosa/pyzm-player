@@ -9,10 +9,17 @@
   $.get(
   "",
   function(data,status) {
+  // update current track
   wp_new = $("#whats_playing", data);
   wp_old = $("#whats_playing");
   wp_old.empty()
   wp_old.append(wp_new)
+
+  // update playlist
+  pl_new = $("#playlist", data);
+  pl_old = $("#playlist");
+  pl_old.empty()
+  pl_old.append(pl_new)
 
   }
   );
@@ -105,7 +112,7 @@
 </TD>
 <TD>
 
-
+  <div id="playlist">
       <ul>
       Play List
       <p>
@@ -119,7 +126,7 @@
       </form>
       </p>
       </ul>
-
+  </div>
 </TD>
 
 <TD>
