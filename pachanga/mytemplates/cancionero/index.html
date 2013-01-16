@@ -94,7 +94,7 @@
 
 <div id="song_DB">
 {% if song_DB %}
-      <ul>
+      <ul style="list-style: none;" >
       Data Base
       <p>
       <form action="{% url 'cancionero:dbToPlayList' %}" method="post" >
@@ -104,8 +104,8 @@
 	  <option value='{{ song.id }}'>{{ song.songName }}-{{ song.songAuthor }}</option>
       {% endfor %}
       
-	<input type="submit" value="Add to PlayList" />
       </select>
+      <li><input type="submit" value="Add to PlayList" /></li>
       </div>
       </form>
       </p>
@@ -119,7 +119,7 @@
 <TD>
 
   <div id="playlist">
-      <ul>
+      <ul style="list-style: none;" >
       Play List
       <p>
       <form action="{% url 'cancionero:removeFromPL' %}" method="post" >
@@ -127,8 +127,8 @@
       {% for songId, songName in song_list %}
 	 <option value='{{songId}}'>{{ songName }}</option>
       {% endfor %}
-      <input type="submit" value="Remove from PL" />
       </select>
+      <li><input type="submit" value="Remove from PL" /></li>
       </form>
       </p>
       </ul>
