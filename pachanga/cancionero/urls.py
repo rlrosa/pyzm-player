@@ -10,6 +10,9 @@ urlpatterns = patterns('',
     url(r'^/stop$', views.stop,  name='stop'),
     url(r'^/nextSong', views.nextSong,  name='nextSong'),
     url(r'^/prev', views.prev,  name='prev'),
+    url(r'^/dbToPlayList', views.dbToPlayList,  name='dbToPlayList'),
+    url(r'^/queueClear', views.queueClear,  name='queueClear'),
+    url(r'^/removeFromPL', views.removeFromPL,  name='removeFromPL'),
 )
 
 

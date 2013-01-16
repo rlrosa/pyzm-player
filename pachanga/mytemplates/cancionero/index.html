@@ -45,6 +45,12 @@
 <input type="submit" value="Prev" />
 </form>
 </TD>
+<TD>
+<form action="{% url 'cancionero:queueClear' %}" method="post" >
+{% csrf_token %}
+<input type="submit" value="Clear Queue" />
+</form>
+</TD>
 </TR>
 </TABLE>
 
@@ -59,12 +65,11 @@
       <ul>
       Data Base
       <p>
-      <form action="{% url 'cancionero:addToPlayList' %}" method="post" >
+      <form action="{% url 'cancionero:dbToPlayList' %}" method="post" >
       <div>
       <select name="song_DB" MULTIPLE size="10">
       {% for song in song_DB %}
-         <li>{{ song.songName }}</li>
-	  <option>{{ song.songName }}-{{ song.songAuthor }}</option>
+	  <option value='{{ song.id }}'>{{ song.songName }}-{{ song.songAuthor }}</option>
       {% endfor %}
       
 	<input type="submit" value="Add to PlayList" />
@@ -85,14 +90,14 @@
       <ul>
       Play List
       <p>
-      
-      <select name="songsList" size="10">
-      {% for song in song_list %}
-         <li>{{ song }}</li>
-	  <option>{{ song }}</option>
+      <form action="{% url 'cancionero:removeFromPL' %}" method="post" >
+      <select name="songsList" MULTIPLE size="10">
+      {% for songId, songName in song_list %}
+	 <option value='{{songId}}'>{{ songName }}</option>
       {% endfor %}
-
+      <input type="submit" value="Remove from PL" />
       </select>
+      </form>
       </p>
       </ul>
 
@@ -106,10 +111,22 @@
     (Player Paused)
     {% endif %}
     <p>
-      <li>Name: {{song_title }}</li>
-      <li>Artist: {{song_artist }}</li>
-      <li>Genre: {{song_genre }}</li>
-      <li>Album: {{song_album }}</li>
+      <TABLE>
+      <TR><TD>Name:</TD>
+      <TD>{{song_title }}</TD>
+      </TR>
+      <TR><TD>Artist:</TD>
+      <TD>{{song_artist }} </TD>
+      </TR>
+      <TR><TD>Album:</TD>
+      <TD>{{song_album }}</TD>
+      </TR>
+      <TR><TD>Style:</TD>
+      <TD>{{song_genre }}</TD>
+      </TR>
+      </TABLE>
+      
+      
     </p>
   </ul>
 
@@ -130,7 +147,7 @@ URL:
 <input type="submit" value="Add to PlayList" />
 <p align=left>
 <i>
-<font size=2> Para agregar a la cola de reproducción sin agregar a la base de datos </font>
+<font size=2> Without adding to the Data Base </font>
 </i> 
 </p>
 </form>
@@ -144,7 +161,7 @@ URL:
 <br>
 <i>
 <font size=5>
-<b>Desea agregar más canciones?</b> 
+<b>Add more songs to the Data Base</b> 
 </font>
 </i> 
 </p>
@@ -153,20 +170,20 @@ URL:
 <form action="{% url 'cancionero:addSong' %}" method="post" >
 {% csrf_token %}
 <TABLE>
-<TR><TD>Nombre del tema:</TD>
+<TR><TD>Name:</TD>
 <TD><input name="name" ></TD>
 </TR>
-<TR><TD>URL del tema:</TD>
+<TR><TD>Source:</TD>
 <TD><input name="url" ></TD>
 </TR>
-<TR><TD>Autor(opcional):</TD>
+<TR><TD>Artist(opcional):</TD>
 <TD><input name="author" > </TD>
 </TR>
-<TR><TD>Estilo(opcional):</TD>
+<TR><TD>Style(opcional):</TD>
 <TD><input name="style" ></TD>
 </TR>
 </TABLE>
-<input type="submit" value="Agregar" />
+<input type="submit" value="Add" />
 </form>
 
 
