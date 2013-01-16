@@ -4,6 +4,18 @@
 
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
 <script type="text/javascript">
+  var updates_enabled = true;
+  function updates(enable){
+  if (enable){
+  updates_enabled = true;
+  console.log('playlist updates enabled!')
+  }
+  else{
+  updates_enabled = false;
+  console.log('playlist updates disabled!')
+  }
+  }
+
   function update_status()
   {
   $.get(
@@ -16,16 +28,18 @@
   wp_old.append(wp_new)
 
   // update playlist
+  if(updates_enabled){
   pl_new = $("#playlist", data);
   pl_old = $("#playlist");
   pl_old.empty()
   pl_old.append(pl_new)
+  }
 
   // update song db
-  db_new = $("#song_DB", data);
-  db_old = $("#song_DB");
-  db_old.empty()
-  db_old.append(db_new)
+//  db_new = $("#song_DB", data);
+//  db_old = $("#song_DB");
+//  db_old.empty()
+//  db_old.append(db_new)
 
   }
   );
@@ -119,16 +133,16 @@
 <TD>
 
   <div id="playlist">
-      <ul style="list-style: none;" >
+      <ul style="list-style: none;" onmouseout="updates(true);" onmouseover="updates(false);" >
       Play List
       <p>
       <form action="{% url 'cancionero:removeFromPL' %}" method="post" >
       <select name="songsList" MULTIPLE size="10">
       {% for songId, songName in song_list %}
-	 <option value='{{songId}}'>{{ songName }}</option>
+	 <option onclick="updates(false);" value='{{songId}}'>{{ songName }}</option>
       {% endfor %}
       </select>
-      <li><input type="submit" value="Remove from PL" /></li>
+      <li><input onclick="updates(true);" type="submit" value="Remove from PL" /></li>
       </form>
       </p>
       </ul>
