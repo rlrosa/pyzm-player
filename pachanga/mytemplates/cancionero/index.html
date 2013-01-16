@@ -1,7 +1,26 @@
 <html>
 <head>
 <title>Pachanga</title>
-<META HTTP-EQUIV="REFRESH" CONTENT="5;URL=">
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script type="text/javascript">
+  function update_status()
+  {
+  $.get(
+  "",
+  function(data,status) {
+  wp_new = $("#whats_playing", data);
+  wp_old = $("#whats_playing");
+  wp_old.empty()
+  wp_old.append(wp_new)
+
+  }
+  );
+
+  }
+  var intervalID = setInterval('update_status();', 1000);
+</script>
+
 </head>
 <body>
 
@@ -100,6 +119,7 @@
 
 <TD>
 
+  <div id="whats_playing">
   <ul>
     What's playing?
     {% if not playing %}
@@ -112,6 +132,7 @@
       <li>Album: {{song_album }}</li>
     </p>
   </ul>
+  </div>
 
 
 
