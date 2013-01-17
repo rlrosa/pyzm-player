@@ -6,6 +6,20 @@
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
 <script type="text/javascript">
   var updates_enabled = true;
+
+
+  function confirmSubmit(text)
+  {
+  if (text == ''){
+    text = "Confirm?"
+  }
+  var agree=confirm(text);
+  if (agree)
+    return true ;
+  else
+    return false ;
+  }
+
   function updates(enable){
   if (enable){
   updates_enabled = true;
@@ -136,7 +150,7 @@
 	 <option onclick="updates(false);" value='{{songId}}'>{{ title }}</option>
       {% endfor %}
       </select>
-      <li><input onclick="updates(true);" type="submit" value="Remove from PL" /></li>
+      <li><input onclick="updates(true);return confirmSubmit('Remove from playlist?')" type="submit" value="Remove from PL" /></li>
       </form>
       </p>
       </ul>
