@@ -1,8 +1,15 @@
-<html>
-<head>
+{% extends "admin/base_site.html" %}
+{% load i18n admin_static %}
 
-<title>{% block title %} Pachanga {% endblock %}</title>
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% static "admin/css/dashboard.css" %}" />{% endblock %}
 
+{% block coltype %}colMS{% endblock %}
+
+{% block bodyclass %}dashboard{% endblock %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
 <script type="text/javascript">
   var updates_enabled = true;
@@ -39,8 +46,6 @@
   // update current track
   wp_new = $("#whats_playing", data);
   wp_old = $("#whats_playing");
-  console.log('new:'+wp_new.html())
-  console.log('old:'+wp_old.html())
   wp_old.empty()
   wp_old.append(wp_new)
 
@@ -64,10 +69,6 @@
   }
   var intervalID = setInterval('update_status();', 1000);
 </script>
-
-</head>
-<body>
-
 
 {% load url from future %}
 
@@ -213,6 +214,4 @@ URL:
 </form>
 {% endblock %}
 
-</body>
-</html>
-
+{% endblock content %}
