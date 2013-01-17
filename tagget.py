@@ -129,7 +129,12 @@ class TagGetter:
         """
         # avoid gst warnings
         self.pbin.set_state(gst.STATE_NULL)
-        # done, lets go
+        # done, lets admit defeat and go
+        for rk in self.req_keys:
+            try:
+                self.tags[rk] = self.file_tags[rk]
+            except KeyError as e:
+                self.tags[rk] = 'unknown'
         self.mainloop.quit()
 
 def get_tags(tags,uri,timeout=2000):
