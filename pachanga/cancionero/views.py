@@ -13,6 +13,21 @@ from cancionero.models import Song
 SERVER_PORT = 5555
 SERVER_IP   = "127.0.0.1"
 
+def getContext():
+    global SERVER_PORT, SERVER_IP
+    cl = PyzmClient(SERVER_IP, SERVER_PORT)
+    # get context info
+    playing, song_curr = getCurrentSong(cl)
+    song_list          = getCurrentPlaylist(cl)
+    song_DB = Song.objects.all()
+    context = Context({
+        'song_list'  : song_list,
+        'song_DB'    : song_DB,
+        'song_curr'  : song_curr,
+        'playing'    : playing,
+    })
+    return context
+
 def getCurrentSong(cl=None):
     playing = False
     song_curr = Song()
@@ -81,20 +96,8 @@ def getCurrentPlaylist(cl=None):
     return song_list
 
 def index(request):
-    global SERVER_PORT, SERVER_IP
-    cl = PyzmClient(SERVER_IP, SERVER_PORT)
-    # get context info
-    playing, song_curr = getCurrentSong(cl)
-    song_list          = getCurrentPlaylist(cl)
-    song_DB = Song.objects.all()
-
+    context = getContext()
     template = loader.get_template('cancionero/base.html')
-    context = Context({
-        'song_list'  : song_list,
-        'song_DB'    : song_DB,
-        'song_curr'  : song_curr,
-        'playing'    : playing,
-    })
     return HttpResponse(template.render(context))
   
 @csrf_exempt
@@ -112,6 +115,11 @@ def addSong(request):
     })
     return HttpResponseRedirect(reverse('cancionero:index'))
     
+@csrf_exempt
+def addToDbCancel(request):
+    template = loader.get_template('cancionero/base.html')
+    context = getContext()
+    return HttpResponse(template.render(context))
     
 @csrf_exempt
 def addToPlayList(request):
@@ -236,20 +244,6 @@ def prev(request):
 
 @csrf_exempt
 def addToDb(request):
-
-    global SERVER_PORT, SERVER_IP
-    cl = PyzmClient(SERVER_IP, SERVER_PORT)
-    # get context info
-    playing, song_curr = getCurrentSong(cl)
-    song_list          = getCurrentPlaylist(cl)
-    song_DB = Song.objects.all()
-
-
+    context = getContext()
     template = loader.get_template('cancionero/base_addToDb.html')
-    context = Context({
-        'song_list'  : song_list,
-        'song_DB'    : song_DB,
-        'song_curr'  : song_curr,
-        'playing'    : playing,
-    })
     return HttpResponse(template.render(context))
