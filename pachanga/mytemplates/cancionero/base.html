@@ -185,7 +185,7 @@
 <form action="{% url 'cancionero:addToPlayList' %}" method="post" >
 {% csrf_token %}
 URL:
-<input name="url" >
+<input name="url" required="required">
 <input type="submit" value="Add to PlayList" />
 <i>
 <font size=2> (Without adding to the Data Base) </font>
