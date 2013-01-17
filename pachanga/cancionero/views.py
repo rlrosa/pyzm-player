@@ -10,17 +10,48 @@ import zmq
 from pyzm_client import PyzmClient
 from cancionero.models import Song
 
-def index(request):
-    
-    cl = PyzmClient("127.0.0.1", 5555)
+SERVER_PORT = 5555
+SERVER_IP   = "127.0.0.1"
 
-    song_list   = []
-    song_title  = 'unknown'
-    song_artist = 'unknown'
-    song_genre  = 'unknown'
-    song_album  = 'unknown'
-    playing     = False
+def getCurrentSong(cl=None):
+    playing = False
+    song_curr = Song()
+    if not cl:
+        cl = PyzmClient(SERVER_IP, SERVER_PORT)
 
+    ans = cl.send_recv("status")
+    if ans[0] == 200:
+        try:
+            playing = ans[2][0]
+        except (IndexError) as e:
+            logging.warning(e)
+        try:
+            song_curr.title = ans[2][2]['tags']['title']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+        try:
+            song_curr.artist = ans[2][2]['tags']['artist']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+        try:
+            song_curr.genre = ans[2][2]['tags']['genre']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+        try:
+            song_curr.album = ans[2][2]['tags']['album']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+        try:
+            song_curr.url = ans[2][2]['uri']
+        except (KeyError,IndexError) as e:
+            logging.warning(e)
+
+    return playing,song_curr
+
+def getCurrentPlaylist(cl=None):
+    song_list = []
+    if not cl:
+        cl = PyzmClient(SERVER_IP, SERVER_PORT)
     ans = cl.send_recv("queue_get")
     index = 0
     if ans[0] == 200:
@@ -47,53 +78,35 @@ def index(request):
             aux = [index, "%s - %s" % (title,album)]
             song_list.append(aux)
             index = index + 1
+    return song_list
 
-    ans = cl.send_recv("status")
-    if ans[0] == 200:
-        try:
-            playing = ans[2][0]
-        except (IndexError) as e:
-            logging.warning(e)
-        try:
-            song_title = ans[2][2]['tags']['title']
-        except (KeyError,IndexError) as e:
-            logging.warning(e)
-        try:
-            song_artist = ans[2][2]['tags']['artist']
-        except (KeyError,IndexError) as e:
-            logging.warning(e)
-        try:
-            song_genre = ans[2][2]['tags']['genre']
-        except (KeyError,IndexError) as e:
-            logging.warning(e)
-        try:
-            song_album = ans[2][2]['tags']['album']
-        except (KeyError,IndexError) as e:
-            logging.warning(e)
-
+def index(request):
+    global SERVER_PORT, SERVER_IP
+    cl = PyzmClient(SERVER_IP, SERVER_PORT)
+    # get context info
+    playing, song_curr = getCurrentSong(cl)
+    song_list          = getCurrentPlaylist(cl)
     song_DB = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list'  : song_list,
         'song_DB'    : song_DB,
-        'song_title' : song_title,
-        'song_artist': song_artist,
-        'song_genre' : song_genre,
-        'song_album' : song_album,
+        'song_curr'  : song_curr,
         'playing'    : playing,
     })
     return HttpResponse(template.render(context))
   
 @csrf_exempt
 def addSong(request):
-    name = request.POST.get('name')
-    url = request.POST.get('url')
-    author = request.POST.get('author')
-    style = request.POST.get('style')
-    newSong = Song(songName=name, songSource=url, songAuthor=author, songStyle=style)
+    title   = request.POST.get('title')
+    url     = request.POST.get('url')
+    artist  = request.POST.get('artist')
+    genre   = request.POST.get('genre')
+    newSong = Song(title=title, url=url, artist=artist, genre=genre, album='unknown')
     newSong.save()
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
@@ -108,7 +121,7 @@ def addToPlayList(request):
     cl.send_recv("queue_add", [url]);
     
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
@@ -125,7 +138,7 @@ def removeFromPL(request):
       cl.send_recv("queue_del", s);      
       
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
@@ -140,10 +153,10 @@ def dbToPlayList(request):
     cl = PyzmClient("127.0.0.1", 5555)
     for s in listS:
       songToPl = Song.objects.get(pk=s)
-      cl.send_recv("queue_add", [songToPl.songSource]);
+      cl.send_recv("queue_add", [songToPl.url]);
     
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
@@ -157,7 +170,7 @@ def queueClear(request):
     cl.send_recv("queue_clear");
     
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
@@ -172,7 +185,7 @@ def play(request):
        
     
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
@@ -186,7 +199,7 @@ def stop(request):
        
     
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
@@ -201,7 +214,7 @@ def nextSong(request):
        
     
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
@@ -215,8 +228,28 @@ def prev(request):
        
     
     song_list = Song.objects.all()
-    template = loader.get_template('cancionero/index.html')
+    template = loader.get_template('cancionero/base.html')
     context = Context({
         'song_list': song_list,
     })
     return HttpResponseRedirect(reverse('cancionero:index'))
+
+@csrf_exempt
+def addToDb(request):
+
+    global SERVER_PORT, SERVER_IP
+    cl = PyzmClient(SERVER_IP, SERVER_PORT)
+    # get context info
+    playing, song_curr = getCurrentSong(cl)
+    song_list          = getCurrentPlaylist(cl)
+    song_DB = Song.objects.all()
+
+
+    template = loader.get_template('cancionero/base_addToDb.html')
+    context = Context({
+        'song_list'  : song_list,
+        'song_DB'    : song_DB,
+        'song_curr'  : song_curr,
+        'playing'    : playing,
+    })
+    return HttpResponse(template.render(context))

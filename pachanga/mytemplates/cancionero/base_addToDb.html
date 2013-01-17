@@ -1,0 +1,29 @@
+{% extends "cancionero/base.html" %}
+
+{% block addToDb %}
+
+<h1>Add more songs to the Data Base</h1> 
+
+{% load url from future %}
+
+<form action="{% url 'cancionero:addSong' %}" method="post" >
+{% csrf_token %}
+<TABLE>
+<TR><TD>Name:</TD>
+<TD><input name="title" required="required"></TD>
+</TR>
+<TR><TD>Source:</TD>
+<TD><input name="url" required="required"></TD>
+</TR>
+<TR><TD>Artist(opcional):</TD>
+<TD><input name="artist" > </TD>
+</TR>
+<TR><TD>Style(opcional):</TD>
+<TD><input name="genre" ></TD>
+</TR>
+</TABLE>
+<input type="submit" value="Add" />
+</form>
+
+
+{% endblock addToDb %}

@@ -1,6 +1,7 @@
 <html>
 <head>
-<title>Pachanga</title>
+
+<title>{% block title %} Pachanga {% endblock %}</title>
 
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
 <script type="text/javascript">
@@ -24,6 +25,8 @@
   // update current track
   wp_new = $("#whats_playing", data);
   wp_old = $("#whats_playing");
+  console.log('new:'+wp_new.html())
+  console.log('old:'+wp_old.html())
   wp_old.empty()
   wp_old.append(wp_new)
 
@@ -45,7 +48,7 @@
   );
 
   }
-  var intervalID = setInterval('update_status();', 500);
+  var intervalID = setInterval('update_status();', 2000);
 </script>
 
 </head>
@@ -54,16 +57,7 @@
 
 {% load url from future %}
 
-<p align=center>
-<i>
-<font size=5>
-<b >Pa  chan  gá EE, pa  chan  gá AA</b> 
-</font>
-</i> 
-</p>
-
-
-
+<h1 >Pa  chan  gá EE, pa  chan  gá AA</h1> 
 
 <TABLE>    
 <TR>
@@ -115,7 +109,7 @@
       <div>
       <select name="song_DB" MULTIPLE size="10">
       {% for song in song_DB %}
-	  <option value='{{ song.id }}'>{{ song.songName }}-{{ song.songAuthor }}</option>
+	  <option value='{{ song.id }}'>{{ song.title }}-{{ song.artist }}</option>
       {% endfor %}
       
       </select>
@@ -138,8 +132,8 @@
       <p>
       <form action="{% url 'cancionero:removeFromPL' %}" method="post" >
       <select name="songsList" MULTIPLE size="10">
-      {% for songId, songName in song_list %}
-	 <option onclick="updates(false);" value='{{songId}}'>{{ songName }}</option>
+      {% for songId, title in song_list %}
+	 <option onclick="updates(false);" value='{{songId}}'>{{ title }}</option>
       {% endfor %}
       </select>
       <li><input onclick="updates(true);" type="submit" value="Remove from PL" /></li>
@@ -160,16 +154,16 @@
     <p>
       <TABLE>
       <TR><TD>Name:</TD>
-      <TD>{{song_title }}</TD>
+      <TD>{{song_curr.title}}</TD>
       </TR>
       <TR><TD>Artist:</TD>
-      <TD>{{song_artist }} </TD>
+      <TD>{{song_curr.artist}} </TD>
       </TR>
       <TR><TD>Album:</TD>
-      <TD>{{song_album }}</TD>
+      <TD>{{song_curr.album}}</TD>
       </TR>
       <TR><TD>Style:</TD>
-      <TD>{{song_genre }}</TD>
+      <TD>{{song_curr.genre}}</TD>
       </TR>
       </TABLE>
       
@@ -198,72 +192,13 @@ URL:
 </i> 
 </form>
 
-
-
-
-
-<p ALIGN=LEFT> 
-<br>
-<br>
-<i>
-<font size=5>
-<b>Add more songs to the Data Base</b> 
-</font>
-</i> 
-</p>
-
-
-<form action="{% url 'cancionero:addSong' %}" method="post" >
+{% block addToDb %}
+<form action="{% url 'cancionero:addToDb' %}" method="post" >
 {% csrf_token %}
-<TABLE>
-<TR><TD>Name:</TD>
-<TD><input name="name" ></TD>
-</TR>
-<TR><TD>Source:</TD>
-<TD><input name="url" ></TD>
-</TR>
-<TR><TD>Artist(opcional):</TD>
-<TD><input name="author" > </TD>
-</TR>
-<TR><TD>Style(opcional):</TD>
-<TD><input name="style" ></TD>
-</TR>
-</TABLE>
-<input type="submit" value="Add" />
+<input type="submit" value="Show Add to DB menu" />
 </form>
+{% endblock %}
 
-
-
-<script language="JavaScript">
-function sendNewSong(){
-    alert('La cancion fue agregada correctamente.');
-}
-
-function addToPlayList(){
-   var id = document.songsList.selectedIndex;
-   var url = document.formNewSong.url.value;
-   var n = document.formNewSong.author.value;
-   var nombre = document.formNewSong.style.value;
-   return true;
-
-}
-
-function play(){
-  
-}
-
-function stop(){
-}
-
-function next(){
-}
-
-function forward(){
-}
-
-function delete(){
-}
-</script> 
 </body>
 </html>
 
