@@ -108,11 +108,7 @@ def addSong(request):
     genre   = request.POST.get('genre')
     newSong = Song(title=title, url=url, artist=artist, genre=genre, album='unknown')
     newSong.save()
-    song_list = Song.objects.all()
     template = loader.get_template('cancionero/base.html')
-    context = Context({
-        'song_list': song_list,
-    })
     return HttpResponseRedirect(reverse('cancionero:index'))
     
 @csrf_exempt
