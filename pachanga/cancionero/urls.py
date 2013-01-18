@@ -14,5 +14,5 @@ urlpatterns = patterns('',
     url(r'^queueClear', views.queueClear,  name='queueClear'),
     url(r'^removeFromPL', views.removeFromPL,  name='removeFromPL'),
     url(r'^addToDb', views.addToDb,  name='addToDb'),
-    url(r'^addToDbCancel', views.addToDbCancel,  name='addToDbCancel'),
+#    url(r'^addToDbCancel', views.addToDbCancel,  name='addToDbCancel'),
 )
