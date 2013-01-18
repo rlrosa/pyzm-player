@@ -12,201 +12,186 @@
 {% block content %}
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
 <script type="text/javascript">
-  var updates_enabled = true;
+var updates_enabled = true;
 
-  {% if fail %}
-  alert('Failed to execute: '+'{{fail.func}}'+'\nError code '+'{{fail.err_code}}'+': '+'{{fail.err_msg}}')
-  {% endif %}
+{% if fail %}
+alert('Failed to execute: '+'{{fail.func}}'+'\nError code '+'{{fail.err_code}}'+': '+'{{fail.err_msg}}')
+{% endif %}
 
-  function confirmSubmit(text)
-  {
+function confirmSubmit(text)
+{
   if (text == ''){
     text = "Confirm?"
   }
   var agree=confirm(text);
   if (agree)
-    return true ;
+  return true ;
   else
     return false ;
-  }
+}
 
-  function updates(enable){
+function updates(enable){
   if (enable){
-  updates_enabled = true;
-  console.log('playlist updates enabled!')
+    updates_enabled = true;
+    console.log('playlist updates enabled!')
   }
   else{
-  updates_enabled = false;
-  console.log('playlist updates disabled!')
+    updates_enabled = false;
+    console.log('playlist updates disabled!')
   }
-  }
+}
 
-  function update_status()
-  {
+function update_status(){
   $.get(
-  "",
-  function(data,status) {
-  // update server status indicator
-  st_new = $("#server_status", data);
-  st_old = $("#server_status");
-  st_old.replaceWith(st_new)
+    "",
+    function(data,status){
+      // update server status indicator
+      st_new = $("#server_status", data);
+      st_old = $("#server_status");
+      st_old.replaceWith(st_new)
 
-  // update current track
-  wp_new = $("#whats_playing", data);
-  wp_old = $("#whats_playing");
-  wp_old.empty()
-  wp_old.append(wp_new)
+      // update current track
+      wp_new = $("#whats_playing", data);
+      wp_old = $("#whats_playing");
+      wp_old.empty()
+      wp_old.append(wp_new)
 
-  // update playlist
-  if(updates_enabled){
-  pl_new = $("#playlist", data);
-  pl_old = $("#playlist");
-  pl_old.empty()
-  pl_old.append(pl_new)
-  }
+      // update playlist
+      if(updates_enabled){
+        pl_new = $("#playlist", data);
+        pl_old = $("#playlist");
+        pl_old.empty()
+        pl_old.append(pl_new)
+      }
 
-  // update song db
-//  db_new = $("#song_DB", data);
-//  db_old = $("#song_DB");
-//  db_old.empty()
-//  db_old.append(db_new)
-
-  }
+      // update song db
+      //  db_new = $("#song_DB", data);
+      //  db_old = $("#song_DB");
+      //  db_old.empty()
+      //  db_old.append(db_new)
+    }
   );
-
-  }
-  var intervalID = setInterval('update_status();', 1000);
+}
+var intervalID = setInterval('update_status();', 1000);
 </script>
 
 {% load url from future %}
 
 <h1 >Pa  chan  gá EE, pa  chan  gá AA
   <font id="server_status"
-	{% if offline %}
-	color="red">&bull;&nbsp;Server offline!
+        {% if offline %}
+        color="red">&bull;&nbsp;Server offline!
         {% else %}
-	color="green">&bull;
+        color="green">&bull;
         {% endif %}
   </font>
 </h1>
 
-<TABLE>    
-<TR>
-<TD>
-<form action="{% url 'cancionero:play' %}" method="post" >
-{% csrf_token %}
-<input type="submit" value="Play" />
-</form>
-</TD>
-<TD>
-<form action="{% url 'cancionero:stop' %}" method="post" >
-{% csrf_token %}
-<input type="submit" value="Stop" />
-</form>
-</TD>
-<TD>
-<form action="{% url 'cancionero:nextSong' %}" method="post" >
-{% csrf_token %}
-<input type="submit" value="Next" />
-</form>
-</TD>
-<TD>
-<form action="{% url 'cancionero:prev' %}" method="post" >
-{% csrf_token %}
-<input type="submit" value="Prev" />
-</form>
-</TD>
-<TD>
-<form action="{% url 'cancionero:queueClear' %}" method="post" >
-{% csrf_token %}
-<input type="submit" value="Clear Queue" />
-</form>
-</TD>
-</TR>
+<TABLE>
+  <TR>
+    <TD>
+      <form action="{% url 'cancionero:play' %}" method="post" >
+      {% csrf_token %}
+        <input type="submit" value="Play" />
+      </form>
+    </TD>
+    <TD>
+      <form action="{% url 'cancionero:stop' %}" method="post" >
+      {% csrf_token %}
+        <input type="submit" value="Stop" />
+      </form>
+    </TD>
+    <TD>
+      <form action="{% url 'cancionero:nextSong' %}" method="post" >
+      {% csrf_token %}
+        <input type="submit" value="Next" />
+      </form>
+    </TD>
+    <TD>
+      <form action="{% url 'cancionero:prev' %}" method="post" >
+      {% csrf_token %}
+        <input type="submit" value="Prev" />
+      </form>
+    </TD>
+    <TD>
+      <form action="{% url 'cancionero:queueClear' %}" method="post" >
+      {% csrf_token %}
+        <input type="submit" value="Clear Queue" />
+      </form>
+    </TD>
+  </TR>
 </TABLE>
 
 
-<TABLE> 
-<TR>
-<TD>
-
-
-<div id="song_DB">
-{% if song_DB %}
-      <ul style="list-style: none;" >
+<TABLE>
+  <TR>
+    <TD>
+      <div id="song_DB">
+      {% if song_DB %}
+        <ul style="list-style: none;" >
       Data Base
-      <p>
-      <form action="{% url 'cancionero:dbToPlayList' %}" method="post" >
-      <div>
-      <select name="song_DB" MULTIPLE size="10">
-      {% for song in song_DB %}
-	  <option value='{{ song.id }}'>{{ song.title }}-{{ song.artist }}</option>
-      {% endfor %}
-      
-      </select>
-      <li><input type="submit" value="Add to PlayList" /></li>
+          <p>
+            <form action="{% url 'cancionero:dbToPlayList' %}" method="post" >
+              <div>
+                <select name="song_DB" MULTIPLE size="10">
+                {% for song in song_DB %}
+                  <option value='{{ song.id }}'>{{ song.title }}-{{ song.artist }}</option>
+                {% endfor %}
+                </select>
+                <li><input type="submit" value="Add to PlayList" /></li>
+              </div>
+            </form>
+          </p>
+        </ul>
+        {% else %}
+        <p>List empty.</p>
+      {% endif %}
       </div>
-      </form>
-      </p>
-      </ul>
-{% else %}
-    <p>List empty.</p>
-{% endif %}
-</div>
-
-</TD>
-<TD>
-
-  <div id="playlist">
-      <ul style="list-style: none;" onmouseout="updates(true);" onmouseover="updates(false);" >
+    </TD>
+    <TD>
+      <div id="playlist">
+        <ul style="list-style: none;" onmouseout="updates(true);" onmouseover="updates(false);" >
       Play List
-      <p>
-      <form action="{% url 'cancionero:removeFromPL' %}" method="post" >
-      <select name="songsList" MULTIPLE size="10">
-      {% for songId, title in song_list %}
-	 <option onclick="updates(false);" value='{{songId}}'>{{ title }}</option>
-      {% endfor %}
-      </select>
-      <li><input onclick="updates(true);return confirmSubmit('Remove from playlist?')" type="submit" value="Remove from PL" /></li>
-      </form>
-      </p>
-      </ul>
-  </div>
-</TD>
-
-<TD>
-
-  <div id="whats_playing">
-  <ul>
+          <p>
+            <form action="{% url 'cancionero:removeFromPL' %}" method="post" >
+              <select name="songsList" MULTIPLE size="10">
+              {% for songId, title in song_list %}
+                <option onclick="updates(false);" value='{{songId}}'>{{ title }}</option>
+              {% endfor %}
+              </select>
+              <li><input onclick="updates(true);return confirmSubmit('Remove from playlist?')" type="submit" value="Remove from PL" /></li>
+            </form>
+          </p>
+        </ul>
+      </div>
+    </TD>
+    <TD>
+      <div id="whats_playing">
+        <ul>
     What's playing?
     {% if not playing %}
     (Player Paused)
     {% endif %}
-    <p>
-      <TABLE>
-      <TR><TD>Name:</TD>
-      <TD>{{song_curr.title}}</TD>
-      </TR>
-      <TR><TD>Artist:</TD>
-      <TD>{{song_curr.artist}} </TD>
-      </TR>
-      <TR><TD>Album:</TD>
-      <TD>{{song_curr.album}}</TD>
-      </TR>
-      <TR><TD>Style:</TD>
-      <TD>{{song_curr.genre}}</TD>
-      </TR>
-      </TABLE>
-      
-      
-    </p>
-  </ul>
-  </div>
-
-
-
-</TD>
-</TR>
+          <p>
+            <TABLE>
+              <TR><TD>Name:</TD>
+                <TD>{{song_curr.title}}</TD>
+              </TR>
+              <TR><TD>Artist:</TD>
+                <TD>{{song_curr.artist}} </TD>
+              </TR>
+              <TR><TD>Album:</TD>
+                <TD>{{song_curr.album}}</TD>
+              </TR>
+              <TR><TD>Style:</TD>
+                <TD>{{song_curr.genre}}</TD>
+              </TR>
+            </TABLE>
+          </p>
+        </ul>
+      </div>
+    </TD>
+  </TR>
 </TABLE>
 <!--<input type=button onclick="next()" value="Next">
 <input type=button onclick="forward()" value="Forward">
@@ -216,17 +201,17 @@
 <form action="{% url 'cancionero:addToPlayList' %}" method="post" >
 {% csrf_token %}
 URL:
-<input name="url" required="required">
-<input type="submit" value="Add to PlayList" />
-<i>
-<font size=2> (Without adding to the Data Base) </font>
-</i> 
+  <input name="url" required="required">
+  <input type="submit" value="Add to PlayList" />
+  <i>
+    <font size=2> (Without adding to the Data Base) </font>
+  </i>
 </form>
 
 {% block addToDb %}
 <form action="{% url 'cancionero:addToDb' %}" method="post" >
 {% csrf_token %}
-<input type="submit" value="Show Add to DB menu" />
+  <input type="submit" value="Show Add to DB menu" />
 </form>
 {% endblock %}
 
