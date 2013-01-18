@@ -46,6 +46,11 @@
   $.get(
   "",
   function(data,status) {
+  // update server status indicator
+  st_new = $("#server_status", data);
+  st_old = $("#server_status");
+  st_old.replaceWith(st_new)
+
   // update current track
   wp_new = $("#whats_playing", data);
   wp_old = $("#whats_playing");
@@ -75,7 +80,15 @@
 
 {% load url from future %}
 
-<h1 >Pa  chan  gá EE, pa  chan  gá AA</h1> 
+<h1 >Pa  chan  gá EE, pa  chan  gá AA
+  <font id="server_status"
+	{% if offline %}
+	color="red">&bull;&nbsp;Server offline!
+        {% else %}
+	color="green">&bull;
+        {% endif %}
+  </font>
+</h1>
 
 <TABLE>    
 <TR>

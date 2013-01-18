@@ -20,8 +20,13 @@ def buildContext():
     global SERVER_PORT, SERVER_IP
     cl = PyzmClient(SERVER_IP, SERVER_PORT)
     # get context info
-    playing, song_curr = getCurrentSong(cl)
-    song_list          = getCurrentPlaylist(cl)
+    playing, song_curr,ans = getCurrentSong(cl)
+    if ans[0] == 407:
+        # timed out waiting for server
+        song_list = []
+    else:
+        song_list              = getCurrentPlaylist(cl)
+
     song_DB = Song.objects.all()
     context = Context({
         'song_list'  : song_list,
@@ -29,6 +34,8 @@ def buildContext():
         'song_curr'  : song_curr,
         'playing'    : playing,
     })
+    if ans[0] == 407:
+        context['offline'] = 'offline'
     return context
 
 def getCurrentSong(cl=None):
@@ -37,7 +44,7 @@ def getCurrentSong(cl=None):
     if not cl:
         cl = PyzmClient(SERVER_IP, SERVER_PORT)
 
-    ans = cl.send_recv("status")
+    ans = cl.send_recv("status",1000)
     if ans[0] == 200:
         try:
             playing = ans[2][0]
@@ -64,7 +71,7 @@ def getCurrentSong(cl=None):
         except (KeyError,IndexError) as e:
             logging.warning(e)
 
-    return playing,song_curr
+    return playing,song_curr,ans
 
 def getCurrentPlaylist(cl=None):
     song_list = []
