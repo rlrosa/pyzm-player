@@ -46,7 +46,7 @@ class PyzmClient:
 
     def __del__(self):
         """ Cleanup zmq stuff if any exists """
-        print "Terminating client..."
+        logging.debug("Terminating client...")
         self.quit(force=True)
 
     def quit(self,force=False):
@@ -112,10 +112,11 @@ class PyzmClient:
             try:
                 cmd_code,cmd_res,data,dec = shared.json_client_dec(ack)
                 ans = [cmd_res,cmd_code,data,dec]
-                logging.debug('will json.dumps to print data on screen')
-                print 'DECODED:',json.dumps(dec,indent=2)
-                if data:
-                    print 'DATA:',data
+                if logging.root.level == logging.DEBUG:
+                    logging.debug('will json.dumps to print data on screen')
+                    print 'DECODED:',json.dumps(dec,indent=2)
+                    if data:
+                        print 'DATA:',data
             except:
                 print 'ERROR: failed to decode json. Raw data:\n%s' % ack
         except Exception as e:
