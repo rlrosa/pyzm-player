@@ -95,7 +95,10 @@ def json_client_dec(msg):
             cmd_res  = dec['ack']['res_code']
             data     = dec['data']
             for i,d in enumerate(data):
-                data[i] = d.encode('ascii','ignore')
+                if type(d) == type(""):
+                    data[i] = d.encode('ascii','ignore')
+                else:
+                    data[i] = d
         except UnicodeEncodeError as e:
             print e
         except KeyError as e:
@@ -155,7 +158,10 @@ def json_server_dec(msg):
             cmd_code = dec['cmd']['code']
             args     = dec['args']
             for i,arg in enumerate(args):
-                args[i] = arg.encode('ascii','ignore')
+                if type(arg) == type(""):
+                    args[i] = arg.encode('ascii','ignore')
+                else:
+                    args[i] = arg
         except UnicodeEncodeError as e:
             print e
         except KeyError as e:
