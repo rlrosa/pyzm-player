@@ -16,7 +16,7 @@ import inspect
 SERVER_PORT = 5555
 SERVER_IP   = "127.0.0.1"
 
-def getContext():
+def buildContext():
     global SERVER_PORT, SERVER_IP
     cl = PyzmClient(SERVER_IP, SERVER_PORT)
     # get context info
@@ -99,7 +99,7 @@ def getCurrentPlaylist(cl=None):
     return song_list
 
 def index(request):
-    context = getContext()
+    context = buildContext()
     template = loader.get_template('cancionero/base.html')
     return HttpResponse(template.render(context))
 
@@ -115,7 +115,7 @@ def addSong(request):
 
 # @csrf_exempt
 # def addToDbCancel(request):
-#     context = getContext()
+#     context = buildContext()
 #     template = loader.get_template('cancionero/base.html')
 #     return HttpResponse(template.render(context))
 
@@ -126,7 +126,7 @@ def addToPlayList(request):
     cl = PyzmClient("127.0.0.1", 5555)
     ans = cl.send_recv("queue_add", [url]);
     if not ans[0] == 200:
-        context = getContext()
+        context = buildContext()
         context['fail'] = {'err_code':ans[0],
                            'err_msg':shared.r_codes[ans[0]],
                            'func':inspect.stack()[0][3]}
@@ -186,6 +186,6 @@ def prev(request):
 
 @csrf_exempt
 def addToDb(request):
-    context = getContext()
+    context = buildContext()
     template = loader.get_template('cancionero/base_addToDb.html')
     return HttpResponse(template.render(context))
