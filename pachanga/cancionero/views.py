@@ -44,7 +44,7 @@ def getCurrentSong(cl=None):
     if not cl:
         cl = PyzmClient(SERVER_IP, SERVER_PORT)
 
-    ans = cl.send_recv("status",1000)
+    ans = cl.send_recv("status",timeout=1000)
     if ans[0] == 200:
         try:
             playing = ans[2][0]
