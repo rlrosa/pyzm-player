@@ -6,5 +6,6 @@ admin.autodiscover()
 
 urlpatterns = patterns('',
     url(r'^cancionero/', include('cancionero.urls', namespace="cancionero")),
+    url(r'^/', include("django_socketio.urls")),
     url(r'^admin/', include(admin.site.urls)),
 )
