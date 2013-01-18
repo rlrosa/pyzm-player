@@ -14,6 +14,9 @@
 <script type="text/javascript">
   var updates_enabled = true;
 
+  {% if fail %}
+  alert('Failed to execute: '+'{{fail.func}}'+'\nError code '+'{{fail.err_code}}'+': '+'{{fail.err_msg}}')
+  {% endif %}
 
   function confirmSubmit(text)
   {

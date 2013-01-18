@@ -10,6 +10,9 @@ import zmq
 from pyzm_client import PyzmClient
 from cancionero.models import Song
 
+# get function name from within function
+import inspect
+
 SERVER_PORT = 5555
 SERVER_IP   = "127.0.0.1"
 
@@ -121,16 +124,17 @@ def addToPlayList(request):
     #listS = request.POST['song_DB'] 
     url = request.POST.get('url')
     cl = PyzmClient("127.0.0.1", 5555)
-    cl.send_recv("queue_add", [url]);
-    
-    song_list = Song.objects.all()
-    template = loader.get_template('cancionero/base.html')
-    context = Context({
-        'song_list': song_list,
-    })
-    return HttpResponseRedirect(reverse('cancionero:index'))
-    
-    
+    ans = cl.send_recv("queue_add", [url]);
+    if not ans[0] == 200:
+        context = getContext()
+        context['fail'] = {'err_code':ans[0],
+                           'err_msg':shared.r_codes[ans[0]],
+                           'func':inspect.stack()[0][3]}
+        template = loader.get_template('cancionero/base.html')
+        return HttpResponse(template.render(context))
+    else:
+        return HttpResponseRedirect(reverse('cancionero:index'))
+
 @csrf_exempt
 def removeFromPL(request):
     listS = request.POST.getlist('songsList')
