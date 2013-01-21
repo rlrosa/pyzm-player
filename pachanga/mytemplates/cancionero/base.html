@@ -30,13 +30,7 @@ var socket;
 var connected = function() {
   console.log('Connection established!');
   connection_up = true;
-//  socket.subscribe('sucket');
-//  if (name) {
-//    socket.send({room: window.room, action: 'start', name: name});
-//    socket.send('hi from pachanga')
-//  } else {
-//    showForm();
-//  }
+  socket.subscribe('sucket');
 };
 
 var disconnected = function() {

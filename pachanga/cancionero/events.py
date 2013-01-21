@@ -12,13 +12,14 @@ def message(request, socket, context):
     logging.debug('Connection established!')
     # connect to zmq, etc
 
-@events.on_message
+@events.on_message(channel='sucket')
 def message(request, socket, context, message):
     """
     Event handler for receiving a message.
     """
     logging.debug(message)
-    socket.send({'msg': 'server says go away'})
+    msg_ans = {'msg': 'server says go away'}
+    socket.send_and_broadcast_channel(msg_ans)
 
 @events.on_finish
 def finish(request, socket, context):
