@@ -1,8 +1,10 @@
 from django.http import HttpResponseRedirect, HttpResponse
 from django.core.urlresolvers import reverse
 from django.shortcuts import render
-from django.template import Context, loader
+from django.template import Context, loader, RequestContext
 from django.views.decorators.csrf import csrf_exempt
+
+from django_socketio import broadcast, broadcast_channel, NoSocket
 
 import cancionero.shared as shared
 import logging
@@ -16,7 +18,7 @@ import inspect
 SERVER_PORT = 5555
 SERVER_IP   = "127.0.0.1"
 
-def buildContext():
+def buildContextDir():
     global SERVER_PORT, SERVER_IP
     cl = PyzmClient(SERVER_IP, SERVER_PORT)
     # get context info
@@ -26,16 +28,28 @@ def buildContext():
         song_list = []
     else:
         song_list              = getCurrentPlaylist(cl)
-
     song_DB = Song.objects.all()
-    context = Context({
+    cdir = {
         'song_list'  : song_list,
         'song_DB'    : song_DB,
         'song_curr'  : song_curr,
         'playing'    : playing,
-    })
+        }
     if ans[0] == 407:
-        context['offline'] = 'offline'
+        cdir['server_ok'] = False
+    else:
+        cdir['server_ok'] = True
+    return cdir
+
+def buildContext():
+    cdir = buildContextDir()
+    context = Context(cdir)
+    return context
+
+def updateContext(request):
+    new_cdir = buildContextDir()
+    context = RequestContext(request)
+    context.update(new_cdir)
     return context
 
 def getCurrentSong(cl=None):
@@ -106,7 +120,7 @@ def getCurrentPlaylist(cl=None):
     return song_list
 
 def index(request):
-    context = buildContext()
+    context = updateContext(request)
     template = loader.get_template('cancionero/base.html')
     return HttpResponse(template.render(context))
 
@@ -122,7 +136,7 @@ def addSong(request):
 
 # @csrf_exempt
 # def addToDbCancel(request):
-#     context = buildContext()
+#     context = updateContext(request)
 #     template = loader.get_template('cancionero/base.html')
 #     return HttpResponse(template.render(context))
 
@@ -133,7 +147,7 @@ def addToPlayList(request):
     cl = PyzmClient("127.0.0.1", 5555)
     ans = cl.send_recv("queue_add", [url]);
     if not ans[0] == 200:
-        context = buildContext()
+        context = updateContext(request)
         context['fail'] = {'err_code':ans[0],
                            'err_msg':shared.r_codes[ans[0]],
                            'func':inspect.stack()[0][3]}
@@ -193,6 +207,6 @@ def prev(request):
 
 @csrf_exempt
 def addToDb(request):
-    context = buildContext()
+    context = updateContext(request)
     template = loader.get_template('cancionero/base_addToDb.html')
     return HttpResponse(template.render(context))
