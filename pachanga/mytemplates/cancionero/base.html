@@ -11,7 +11,10 @@
 
 {% block content %}
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
-<script src="/static/js/socket.io.js"></script>
+
+{% load socketio_tags %}
+{% socketio %}
+
 <script type="text/javascript">
 var updates_enabled = true;
 
@@ -19,9 +22,6 @@ var updates_enabled = true;
 alert('Failed to execute: '+'{{fail.func}}'+'\nError code '+'{{fail.err_code}}'+': '+'{{fail.err_msg}}')
 {% endif %}
 
-{% load socketio_tags %}
-{# this fkuc doesn't want to work, example code works, it's some path thing #}
-{#{% socketio %}#}
 
 console.log('running init js...')
 var connection_up = false;
@@ -45,13 +45,12 @@ var disconnected = function() {
 };
 
 var messaged = function(data) {
-  console.debug('data rx!');
-  console.debug(data);
+  console.debug('RX: '+data['msg']);
 };
 
 function start(){
   socket = new io.Socket();
-  console.debug('Will attempt to connect')
+  console.debug('Will attempt to connect..')
   socket.connect();
   socket.on('connect', connected);
   socket.on('disconnect', disconnected);
@@ -60,8 +59,9 @@ function start(){
 
 function send_socket_test(){
   if (connection_up){
-    console.debug('Will send message')
-    socket.send({msg:'hi from pachanga'});
+    msg = 'hi from pachanga'
+    console.debug('TX: ' + msg)
+    socket.send({'msg':msg});
   }
   else{
     console.debug('Will attempt to open socket');
