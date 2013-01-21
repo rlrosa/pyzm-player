@@ -132,7 +132,7 @@ var intervalID = setInterval('update_status();', 1000);
 
 <h1 >Pa  chan  gá EE, pa  chan  gá AA
   <font id="server_status"
-        {% if offline %}
+        {% if not server_ok %}
         color="red">&bull;&nbsp;Server offline!
         {% else %}
         color="green">&bull;
