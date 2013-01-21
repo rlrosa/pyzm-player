@@ -260,8 +260,6 @@ class PlayerControl():
 
     # zmq variables
     port    = None
-    context = None
-    server  = None
     src     = None
 
     def __init__(self, src, port=5555, verify_on_load=False):
