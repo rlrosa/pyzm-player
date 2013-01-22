@@ -13,7 +13,7 @@ zmq_ctx = zmq.Context()
 run     = False
 zmq_t   = None
 
-def zmq_subscriber(socketio):
+def zmq_subscriber(socketio, ip='127.0.0.1', port=5556):
     # For too many threads spawning new connection will cause a
     # "too many mailboxes" error, but for small amounts of
     # threads this is fine.
