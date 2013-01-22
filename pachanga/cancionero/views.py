@@ -63,27 +63,27 @@ def getCurrentSong(cl=None):
         try:
             playing = ans[2][0]
         except (IndexError) as e:
-            logging.warning(e)
+            logging.debug(e)
         try:
             song_curr.title = ans[2][2]['tags']['title']
         except (KeyError,IndexError) as e:
-            logging.warning(e)
+            logging.debug(e)
         try:
             song_curr.artist = ans[2][2]['tags']['artist']
         except (KeyError,IndexError) as e:
-            logging.warning(e)
+            logging.debug(e)
         try:
             song_curr.genre = ans[2][2]['tags']['genre']
         except (KeyError,IndexError) as e:
-            logging.warning(e)
+            logging.debug(e)
         try:
             song_curr.album = ans[2][2]['tags']['album']
         except (KeyError,IndexError) as e:
-            logging.warning(e)
+            logging.debug(e)
         try:
             song_curr.url = ans[2][2]['uri']
         except (KeyError,IndexError) as e:
-            logging.warning(e)
+            logging.debug(e)
 
     return playing,song_curr,ans
 
@@ -118,6 +118,7 @@ def getCurrentPlaylist(cl=None):
             song_list.append(aux)
             index = index + 1
     return song_list
+
 
 def index(request):
     context = updateContext(request)
