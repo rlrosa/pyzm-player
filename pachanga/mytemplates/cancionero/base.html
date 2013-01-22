@@ -29,6 +29,7 @@ var socket;
 
 function update_socket_conn(){
   $("#send_socket_test").css("color",(connection_up)?"green":"red");
+  $("#send_socket_test").val((connection_up)?"\u2022":"Reconnect websocket")
 };
 
 var connected = function() {
@@ -131,6 +132,11 @@ function update_status(){
       //  db_old.append(db_new)
     }
   );
+  if (!connection_up) {
+    // attemp to restore connection
+    console.log('Connection is down, will attempt to restore it...')
+    send_socket_test()
+  }
 }
 
 var intervalID = setInterval('update_status();', 5000);
