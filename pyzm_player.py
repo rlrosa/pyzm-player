@@ -85,7 +85,7 @@ class GstPlayer():
         self.playing = False
         self.player  = gst.element_factory_make("playbin", "player")
         self.bus     = self.player.get_bus()
-        self.cb_eos = cb_eos if not None else self.stop()
+        self.cb_eos = cb_eos if not (cb_eos == None) else self.stop()
 
     def on_message(self, bus, message):
         t = message.type
@@ -259,14 +259,27 @@ class PlayerControl():
     queue_pos= None
 
     # zmq variables
-    port    = None
-    src     = None
+    port        = None
+    src         = None
+    pub_context = None
+    pub_socket  = None
 
-    def __init__(self, src, port=5555, verify_on_load=False):
+    def __init__(self, src, port=5555, verify_on_load=False, zmq_pub={}):
+        if not zmq_pub:
+            zmq_pub['port'] = 5556
+            zmq_pub['ip']   = '*'
+        try:
+            self.pub_context = zmq.Context()
+            self.pub_socket = self.pub_context.socket(zmq.PUB)
+            self.pub_socket.bind("tcp://%s:%d" % (zmq_pub['ip'],zmq_pub['port']))
+        except Exception as e:
+            # cannot go on if zmq failed
+            raise e
+
         self.port           = port
         self.src            = src
         self.verify_on_load = verify_on_load
-        self.player         = GstPlayer(self.queue_next)
+        self.player         = GstPlayer(self.queue_next_publish)
         self.gst_listener   = GstListener(args=(self.player.bus, self.player.on_message),kwargs=[])
         self.listener       = Listener(args=(self.handle_cmd, self.src, self.port),kwargs=[])
         self.queue          = list()
@@ -292,6 +305,41 @@ class PlayerControl():
     def __del__(self):
         """ Cleanup zmq stuff if any exists """
         gst.debug("Terminating server...")
+        if self.pub_context:
+            if self.pub_socket:
+                gst.debug("Closing pub socket...")
+                self.pub_socket.close()
+                gst.debug("pub socket closed!")
+            gst.debug("Terminating zmq pub context...")
+            self.pub_context.term()
+            gst.debug("zmq pub context terminated!")
+
+    def publish(self, json_msg=None, status=False, pl=False):
+        if not self.pub_socket:
+            gst.error('Cannot publish, no zmq socket')
+        else:
+            if json_msg:
+                # publish ans to a command executed
+                # by some client
+                gst.debug('Will publish ans message')
+                self.pub_socket.send(json_msg)
+                gst.debug('Published: ans message')
+            if status:
+                # publish status update
+                gst.debug('Will publish status update')
+                ans = self.status()
+                json_ans = self.build_json_ans(shared.cmd_name_id['status'],
+                                               ans)
+                self.publish(json_ans)
+                gst.debug('Published: status update')
+            if pl:
+                # publish playlist update
+                gst.debug('Will publish queue update')
+                ans = self.queue_get()
+                json_ans = self.build_json_ans(shared.cmd_name_id['queue_get'],
+                                               ans)
+                self.publish(json_ans)
+                gst.debug('Published: queue update')
 
     def register(self, event, callback):
         self.handlers[event].add(callback)
@@ -541,6 +589,16 @@ class PlayerControl():
             gst.debug(err_msg)
             ans = [400]
             ans.append(err_msg)
+        return ans
+
+    def queue_next_publish(self,step=1):
+        ans = self.queue_next(step)
+        if ans[0] == 200:
+            try:
+                self.publish(status=True)
+            except Exception as e:
+                err_msg = 'Exception: %s' % e.__str__()
+                gst.error(err_msg)
         return ans
 
     def queue_next(self,step=1):
@@ -838,6 +896,12 @@ class PlayerControl():
                 gst.error('Problem near: find Id for cmd: %s' % cmd)
 
         # Take cmd result and prepare answer to send to client
+        json_ans = self.build_json_ans(cmd_code,ans)
+
+        self.publish(json_msg=json_ans)
+        return json_ans
+
+    def build_json_ans(self,cmd_code,ans):
         gst.debug('ans(len=%d)=%s' % (len(ans),ans))
         assert(len(ans) == 1 or len(ans) == 2) # (code, data)
         data = []
