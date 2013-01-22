@@ -3,31 +3,39 @@ from django.utils.html import strip_tags
 from django_socketio import events
 
 import logging
+import zmq
+import threading
 
-from gevent_zeromq import zmq
-from gevent import spawn
 zmq_ctx = zmq.Context()
 zmq_sub = None
+run     = False
+zmq_t   = None
 
 def zmq_subscriber(socketio):
     # For too many threads spawning new connection will cause a
     # "too many mailboxes" error, but for small amounts of
     # threads this is fine.
 
-    global zmq_ctx, zmq_sub
+    global zmq_ctx, zmq_sub, run
     subscriber = zmq_ctx.socket(zmq.SUB)
     subscriber.connect("tcp://127.0.0.1:5556")
 
-    # setsockopt doesn't like unicode
-    subscriber.setsockopt(zmq.SUBSCRIBE, '')
+    try:
+        # setsockopt doesn't like unicode
+        subscriber.setsockopt(zmq.SUBSCRIBE, '')
+        socketio.send({'msg':'django connected'})
+    except Exception as e:
+        raise e
 
-    socketio.send({'msg':'django connected'})
-
-    while True:
+    while run:
         msg = subscriber.recv()
         logging.debug('RX: %s' % msg)
         if msg:
             socketio.send({'msg':msg})
+    if zmq_sub:
+        logging.debug('closing zmq subscriber')
+        zmq_sub.close()
+        zmq_sub = None
 
 @events.on_connect
 def message(request, socket, context):
@@ -40,7 +48,12 @@ def message(request, socket, context):
         zmq_running = context['socket_up']
     except KeyError as e:
         socketio = request.environ['socketio']
-        spawn(zmq_subscriber, socketio)
+        zmq_t = threading.Thread(target=zmq_subscriber,
+                                 args=[socketio])
+        global run
+        run = True
+        zmq_t.start()
+#        spawn(zmq_subscriber, socketio)
         context['socket_up'] = True
         logging.info('zmq subscriber running')
 
@@ -60,9 +73,13 @@ def finish(request, socket, context):
     the user leaving and delete them from the DB.
     """
     logging.debug('leaving...')
+    global zmq_ctx, zmq_t, run
+    run = False
+    if zmq_t:
+        logging.debug('Waiting for zmq sub thread to join()...')
+        zmq_t.join()
+        logging.debug('zmq sub thread finished!')
     if zmq_ctx:
-        if zmq_sub:
-            logging.debug('closing zmq subscriber')
-            zmq_sub.close()
         logging.debug('terminating zmq context')
         zmq_ctx.term()
+        zmq_ctx = None
