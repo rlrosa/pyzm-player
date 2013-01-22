@@ -298,6 +298,8 @@ class PlayerControl():
         self.register('queue_prev',self.queue_prev)
         self.register('quit',self.quit)
         self.register('help',self.help)
+        self.register('no_pub_status',self.status)
+        self.register('no_pub_queue_get',self.queue_get)
 
     def __enter__(self):
         return self
@@ -898,7 +900,10 @@ class PlayerControl():
         # Take cmd result and prepare answer to send to client
         json_ans = self.build_json_ans(cmd_code,ans)
 
-        self.publish(json_msg=json_ans)
+        if not shared.cmd_id_name[cmd_code].startswith('no_pub'):
+            #TODO: this could be much nicer if commands accepted
+            #      arguments as kwargs.
+            self.publish(json_msg=json_ans)
         return json_ans
 
     def build_json_ans(self,cmd_code,ans):

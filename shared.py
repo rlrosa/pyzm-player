@@ -30,6 +30,8 @@ cmd_id_name = {
     9: 'queue_prev',
     10:'help',
     11:'quit',
+    12:'no_pub_status',
+    13:'no_pub_queue_get',
 }
 
 cmd_name_id = dict((v,k) for k, v in cmd_id_name.iteritems())
