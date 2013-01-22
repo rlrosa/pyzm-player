@@ -58,7 +58,7 @@ def getCurrentSong(cl=None):
     if not cl:
         cl = PyzmClient(SERVER_IP, SERVER_PORT)
 
-    ans = cl.send_recv("status",timeout=1000)
+    ans = cl.send_recv("no_pub_status",timeout=1000)
     if ans[0] == 200:
         try:
             playing = ans[2][0]
@@ -91,7 +91,7 @@ def getCurrentPlaylist(cl=None):
     song_list = []
     if not cl:
         cl = PyzmClient(SERVER_IP, SERVER_PORT)
-    ans = cl.send_recv("queue_get")
+    ans = cl.send_recv("no_pub_queue_get")
     index = 0
     if ans[0] == 200:
         logging.debug('queue_get ok, analyzing answer')
