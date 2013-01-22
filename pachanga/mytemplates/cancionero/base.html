@@ -27,19 +27,29 @@ console.log('running init js...')
 var connection_up = false;
 var socket;
 
+function update_socket_conn(){
+  $("#send_socket_test").css("color",(connection_up)?"green":"red");
+};
+
 var connected = function() {
   console.log('Connection established!');
   connection_up = true;
   socket.subscribe('sucket');
+  update_socket_conn();
 };
 
 var disconnected = function() {
   console.log('Disconnected...');
+  connection_up = false;
+  update_socket_conn();
   setTimeout(start, 1000);
 };
 
 var messaged = function(data) {
   console.debug('RX: '+data['msg']);
+  console.log('Will update...');
+  update_status();
+  console.log('Update complete!');
 };
 
 function start(){
@@ -63,6 +73,9 @@ function send_socket_test(){
   }
 };
 
+{% if not socket_up %}
+send_socket_test()
+{% endif %}
 
 function confirmSubmit(text)
 {
@@ -119,7 +132,8 @@ function update_status(){
     }
   );
 }
-var intervalID = setInterval('update_status();', 1000);
+
+//var intervalID = setInterval('update_status();', 8000);
 </script>
 
 {% load url from future %}
@@ -165,6 +179,11 @@ var intervalID = setInterval('update_status();', 1000);
       {% csrf_token %}
         <input type="submit" value="Clear Queue" />
       </form>
+    </TD>
+    <TD>
+      <div>
+        <input type="button" value="socket test" id="send_socket_test" onclick="send_socket_test()"/>
+      </div>
     </TD>
   </TR>
 </TABLE>
@@ -254,10 +273,6 @@ URL:
     <font size=2> (Without adding to the Data Base) </font>
   </i>
 </form>
-
-<div>
-  <input type="button" value="socket" id="send_socket_test" onclick="send_socket_test()"/>
-</div>
 
 {% block addToDb %}
 <form action="{% url 'cancionero:addToDb' %}" method="post" >
