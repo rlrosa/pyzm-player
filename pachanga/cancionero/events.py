@@ -10,7 +10,6 @@ import threading
 import inspect
 
 zmq_ctx = zmq.Context()
-zmq_sub = None
 run     = False
 zmq_t   = None
 
