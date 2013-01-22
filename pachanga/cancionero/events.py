@@ -9,14 +9,29 @@ from gevent import spawn
 zmq_ctx = zmq.Context()
 zmq_sub = None
 
-def zmq_subscriber(socketio):
+def zmq_subscriber(socketio, ip='127.0.0.1', port=5556):
+    """
+    Launches a subscriber (zmq.SUB) on ip:port that will receive
+    status updates/cmd_exe_results from pyzm_player, who is in charge
+    of publishing.
+    Whatever msg is received is sent out via socketio. js cb should be
+    configured in html to catch the msg and do whatever refresh is
+    needed. Example can be found in base.html
+
+    Arguments:
+      - socketio: output socket, input will be fwd to here.
+      - ip,port : of the server this instance should subscribe to.
+
+    Notes:
+      - Assumes zmq context has been initialized
+    """
     # For too many threads spawning new connection will cause a
     # "too many mailboxes" error, but for small amounts of
     # threads this is fine.
 
     global zmq_ctx, zmq_sub
     subscriber = zmq_ctx.socket(zmq.SUB)
-    subscriber.connect("tcp://127.0.0.1:5556")
+    subscriber.connect("tcp://%s:%d" % (ip,port))
 
     # setsockopt doesn't like unicode
     subscriber.setsockopt(zmq.SUBSCRIBE, '')
