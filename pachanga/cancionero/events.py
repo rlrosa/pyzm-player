@@ -50,6 +50,7 @@ def message(request, socket, context):
         socketio = request.environ['socketio']
         zmq_t = threading.Thread(target=zmq_subscriber,
                                  args=[socketio])
+        zmq_t.setDaemon(True)
         global run
         run = True
         zmq_t.start()
