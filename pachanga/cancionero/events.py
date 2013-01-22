@@ -6,6 +6,9 @@ import logging
 import zmq
 import threading
 
+# get function name from within function
+import inspect
+
 zmq_ctx = zmq.Context()
 zmq_sub = None
 run     = False
@@ -16,20 +19,20 @@ def zmq_subscriber(socketio):
     # "too many mailboxes" error, but for small amounts of
     # threads this is fine.
 
-    global zmq_ctx, zmq_sub, run
-    subscriber = zmq_ctx.socket(zmq.SUB)
-    subscriber.connect("tcp://127.0.0.1:5556")
+    global zmq_ctx, run
+    zmq_sub = zmq_ctx.socket(zmq.SUB)
+    zmq_sub.connect("tcp://127.0.0.1:5556")
 
     try:
         # setsockopt doesn't like unicode
-        subscriber.setsockopt(zmq.SUBSCRIBE, '')
+        zmq_sub.setsockopt(zmq.SUBSCRIBE, '')
         socketio.send({'msg':'django connected'})
     except Exception as e:
         raise e
 
     while run:
-        msg = subscriber.recv()
-        logging.debug('RX: %s' % msg)
+        msg = zmq_sub.recv()
+        logging.debug('%s-RX: %s' % (inspect.stack()[0][3],msg))
         if msg:
             socketio.send({'msg':msg})
     if zmq_sub:
