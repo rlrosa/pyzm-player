@@ -25,7 +25,7 @@ alert('Failed to execute: '+'{{fail.func}}'+'\nError code '+'{{fail.err_code}}'+
 
 console.log('running init js...')
 var connection_up = false;
-var socket;
+var socket = null;
 
 function update_socket_conn(){
   $("#send_socket_test").css("color",(connection_up)?"green":"red");
@@ -45,6 +45,17 @@ var disconnected = function() {
   update_socket_conn();
   setTimeout(start, 1000);
 };
+
+window.onbeforeunload = function(){
+  // cleanup connections
+  if (connection_up || socket){
+    console.log('will disconnect socket');
+    socket.unsubscribe();
+    socket.disconnect();
+    connection_up = false;
+    console.log('socket disconnected');
+  }
+}
 
 var messaged = function(data) {
   console.debug('RX: '+data['msg']);
